@@ -3,12 +3,15 @@ import Header from '../components/Header'
 import SpecialityMenu from '../components/SpecialityMenu'
 import TopDoctors from '../components/TopDoctors'
 import Banner from '../components/Banner'
+import SymptomChecker from '../components/SymptomChecker'
 
 const Home = () => {
   return (
     <div className=''>
       <Header/>
+      <SymptomChecker/>
       <SpecialityMenu />
+
       <TopDoctors />
       <Banner />
     </div>

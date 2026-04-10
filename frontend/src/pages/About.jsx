@@ -3,52 +3,90 @@ import { assets } from '../assets/assets'
 
 const About = () => {
   return (
-    <div>
+    <div className='md:mx-10'>
 
-      <div className='text-center text-2xl pt-10 text-gray-500'>
-        <p> ABOUT <span className='text-gray-700 font-medium'> US</span></p>
+      {/* Heading */}
+      <div className='text-center text-3xl pt-12 text-gray-600'>
+        <p>ABOUT <span className='text-gray-900 font-semibold'>DOCNEST</span></p>
       </div>
 
-      <div className='my-10 flex flex-col md:flex-row gap-12 '>
-        <img className='w-full md:max-w-[360px]' src={assets.about_image} alt="" />
+      {/* Section 1 */}
+      <div className='my-12 flex flex-col md:flex-row items-center gap-12'>
+        
+        <img 
+          className='w-full md:max-w-[420px] rounded-xl shadow-md' 
+          src={assets.about_image} 
+          alt="about" 
+        />
 
-
-        <div className='flex flex-col justify-center gap-6 md:w-2/4 text-sm text-gray-600' >
+        <div className='flex flex-col justify-center gap-6 md:w-1/2 text-gray-600 leading-7'>
+          
           <p>
-            Wlecome  To Heal Prescripto, Your Trusted Partner In Managing Your Healthcare Needs Conveniently And Effectively.
-            At Heal. We Understand The Challenges Individuals Face When It Comes To Scheduling Doctor
-            Appointments And Managing Their Health Records.
+            Welcome to <span className='font-medium text-gray-800'>DocNest</span>, your trusted platform for booking doctor appointments 
+            quickly and easily. We simplify healthcare access by connecting patients with verified medical professionals.
           </p>
-          <p> Heal is Commited To Excellence In Healthcare Technology. We Continuously Strive To Enhance Our
-            Platform,Integrating The Latest Advacements To Improve user Experience And Deliver Superior Service.
-            Wheather You're Booking Your First Appointment  Or managing Ongoing Care, Heal is Here To Support Your Every Step Of The Way.
+
+          <p>
+            At DocNest, we understand the challenges of managing appointments and maintaining health records. 
+            Our platform is designed to provide a seamless and stress-free experience for users.
           </p>
-          <b>Our Vision</b>
-          <p>Our Vision At Prescripto is To Create A Seamless Healthcare Exprerience For Every User. We Aim To Bridge The
-            Gap Between Patients And Healthcare Providers. Making it Easier For You To Access The Care You Need When You Need it.
+
+          <p>
+            We are committed to innovation in healthcare technology, continuously improving our platform 
+            to deliver better services and user experience.
           </p>
+
+          <div>
+            <p className='font-semibold text-gray-800'>Our Vision</p>
+            <p>
+              To create a seamless healthcare ecosystem where patients can easily connect with doctors 
+              and access quality medical care anytime, anywhere.
+            </p>
+          </div>
+
         </div>
       </div>
 
-      <div className='text-xl my-4'>
-        <p>WHY <span className='text-gray-700 font-semibold'>CHOOSE US</span></p>
+      {/* WHY CHOOSE US */}
+      <div className='text-2xl my-6 text-gray-700 font-semibold'>
+        WHY CHOOSE US
       </div>
 
-      <div className='flex flex-col md:flex-row mb-20'>
-        <div className='border px-10 md:px-16 py-8 sm:py-16 flex flex-col gap-5 text-sm hover:bg-primary hover:text-white transition-all duration-300 text-gray-600 cursor-pointer'>
-          <b>Efficiency</b>
-          <p> Streamlined appointment scheduling that fits into your busy lifestyle.</p>
+      <div className='grid md:grid-cols-3 gap-6 mb-20'>
+
+        {/* Card 1 */}
+        <div className='border rounded-xl px-8 py-10 flex flex-col gap-4 text-gray-600 
+        hover:bg-gradient-to-r hover:from-blue-600 hover:to-purple-600 hover:text-white 
+        transition-all duration-300 shadow-sm hover:shadow-lg cursor-pointer'>
+          
+          <b className='text-lg'>Efficiency</b>
+          <p>
+            Book appointments in seconds with our fast and streamlined system.
+          </p>
         </div>
 
-        <div className='border px-10 md:px-16 py-8 sm:py-16 flex flex-col gap-5 text-sm hover:bg-primary hover:text-white transition-all duration-300 text-gray-600 cursor-pointer'>
-           <b>Convenience</b>
-          <p>Access to a network of trusted healthcare professionals in your area.</p>
+        {/* Card 2 */}
+        <div className='border rounded-xl px-8 py-10 flex flex-col gap-4 text-gray-600 
+        hover:bg-gradient-to-r hover:from-blue-600 hover:to-purple-600 hover:text-white 
+        transition-all duration-300 shadow-sm hover:shadow-lg cursor-pointer'>
+          
+          <b className='text-lg'>Convenience</b>
+          <p>
+            Access a wide network of trusted doctors from the comfort of your home.
+          </p>
         </div>
 
-        <div className='border px-10 md:px-16 py-8 sm:py-16 flex flex-col gap-5 text-sm hover:bg-primary hover:text-white transition-all duration-300 text-gray-600 cursor-pointer'>
-           <b>Personalization</b>
-          <p>Tailored recomendation and reminders to help you stay on top of your health</p>
+        {/* Card 3 */}
+        <div className='border rounded-xl px-8 py-10 flex flex-col gap-4 text-gray-600 
+        hover:bg-gradient-to-r hover:from-blue-600 hover:to-purple-600 hover:text-white 
+        transition-all duration-300 shadow-sm hover:shadow-lg cursor-pointer'>
+          
+          <b className='text-lg'>Personalization</b>
+          <p>
+            Get personalized recommendations and reminders for better healthcare management.
+          </p>
         </div>
+
       </div>
 
     </div>

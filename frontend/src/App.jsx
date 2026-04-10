@@ -11,6 +11,7 @@ import About from './pages/About'
 import Appointment from './pages/Appointment'
 import Footer from './components/Footer'
 import { ToastContainer, toast } from 'react-toastify';
+import Chatbot from './components/Chatbot'
 
 const App = () => {
   return (
@@ -27,10 +28,12 @@ const App = () => {
       <Route path='/my-profile' element={<MyProfile/>} />
       <Route path='/my-appointments' element={<MyAppointments/>} />
       <Route path='/appointment/:docId' element={<Appointment/>} />
+      <Route path='/appointment/:id' element={<Appointment/>} />
 
         
      </Routes>
      <Footer />
+     <Chatbot/>
       
     </div>
   )

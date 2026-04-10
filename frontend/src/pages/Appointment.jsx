@@ -1,26 +1,55 @@
 import React, { useContext, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppContext } from '../context/AppContext'
 import { assets } from '../assets/assets'
 import RelatedDoctors from '../components/RelatedDoctors'
 import { toast } from 'react-toastify'
 import axios from 'axios'
+import Review from '../components/Review'
+import ChatWindow from '../components/ChatWindow'
+import VideoCall from '../components/VideoCall'
+
 
 const Appointment = () => {
   const { docId } = useParams()
-  const { doctors, currencySymbol, backendUrl, token, getDoctorsData } = useContext(AppContext)
+  const { doctors, currencySymbol, backendUrl, token, getDoctorsData, userData } = useContext(AppContext)
   const dayOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
   const navigate = useNavigate()
+  const location = useLocation();
+  const isReviewMode = location.state?.review;
+  const canReview = location.state?.canReview;
+  const appointmentId = location.state?.appointmentId;
+  const [doctorReviews, setDoctorReviews] = useState([]);
+  const [reviewSummary, setReviewSummary] = useState(null);
+
 
   const [docInfo, setDocInfo] = useState(null)
   const [docSlots, setDocSlots] = useState([])
   const [slotIndex, setSlotIndex] = useState(0)
   const [slotTime, setSlotTime] = useState('')
 
-  const fetchDocInfo = async () => {
-    const docInfo = doctors.find(doc => doc._id === docId)
-    setDocInfo(docInfo)
+  const [showChat, setShowChat] = useState(false)
+
+  const fetchDoctorReviews = async () => {
+    try {
+      const { data } = await axios.get(
+        backendUrl + `/api/reviews/doctor/${docId}`
+      );
+      if (data.success) {
+        setDoctorReviews(data.reviews);
+        setReviewSummary(data.summary);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const fetchDocInfo = () => {
+    if (doctors.length > 0) {
+      const foundDoc = doctors.find(doc => doc._id?.toString() === docId)
+      setDocInfo(foundDoc)
+    }
   }
 
   const getAvailableSlots = async () => {
@@ -147,14 +176,22 @@ const Appointment = () => {
     console.log(docSlots)
   }, [docSlots])
 
+  useEffect(() => {
+    fetchDoctorReviews();
+  }, [docId]);
+
+  if (!docInfo) {
+    return <p className="text-center mt-20">Loading...</p>
+  }
   return docInfo && (
     <div>
+       
       {/* doctor detail */}
       <div className='flex flex-col sm:flex-row gap-4'>
-        <div>
-          <img className='bg-primary w-full sm:max-w-72 rounded-lg' src={docInfo.image} alt="" />
+        <div className=' rounded-xl'>
+          <img className='p-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full sm:max-w-72 rounded-lg bg-white' src={docInfo.image} alt="" />
         </div>
-        <div className='flex-1 border border-gray-400 rounded-lg p-8 py-7  bg-white mx-2 sm:mx-0 mt-[-80px] sm:mt-0'>
+        <div className='flex-1 rounded-xl p-8 py-7 bg-white shadow-xl mx-2 sm:mx-0 mt-[-80px] sm:mt-0'>
           {/* details */}
           <p className='flex items-center gap-2 text-2xl font-medium text-gray-900'> {docInfo.name}
             <img className='w-5' src={assets.verified_icon} alt="" /></p>
@@ -172,6 +209,25 @@ const Appointment = () => {
           <p className='text-gray-500 font-medium mt-4'>
             Appointment fee:  <span className='text-gray-600'>{currencySymbol} {docInfo.fees}</span>
           </p>
+
+          {token ? (
+            <button
+              onClick={() => setShowChat(true)}
+              className='mt-4 flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full text-sm hover:scale-105 transition-all duration-300'
+            >
+              💬 Chat with Doctor
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className='mt-4 flex items-center gap-2 border border-indigo-400 text-indigo-600 px-6 py-2 rounded-full text-sm'
+            >
+              💬 Login to Chat
+            </button>
+          )}
+
+         
+
         </div>
       </div>
 
@@ -181,7 +237,9 @@ const Appointment = () => {
         <div className=' flex gap-3 items-center w-full overflow-x-scroll mt-4'>
           {
             docSlots.length && docSlots.map((item, index) => (
-              <div onClick={() => setSlotIndex(index)} className={`text-center py-6 min-w-16 rounded-full cursor-pointer ${slotIndex === index ? 'bg-primary text-white' : 'border border-gray-400'}`} key={index}>
+              <div onClick={() => setSlotIndex(index)}
+                className={`text-center py-6 min-w-16 rounded-full cursor-pointer
+               text-gray-900 ${slotIndex === index ? 'bg-indigo-600 text-white' : 'border border-gray-300'}`} key={index}>
                 <p> {item[0] && dayOfWeek[item[0].datetime.getDay()]} </p>
                 <p>{item[0] && item[0].datetime.getDate()}</p>
               </div>
@@ -192,7 +250,15 @@ const Appointment = () => {
         <div className='flex items-center gap-3 w-full overflow-x-scroll mt-4'>
           {docSlots.length > 0 && docSlots[slotIndex]?.map((item, index) => (
 
-            <p onClick={() => setSlotTime(item.time)} key={index} className={`text-sm font-light flex-shrink-0 px-5 py-2 rounded-full cursor-pointer ${item.time === slotTime ? 'bg-primary text-white' : 'text-gray-400 border border-gray-300'}`}>
+            <p
+              onClick={() => setSlotTime(item.time)}
+              key={index}
+              className={`text-sm font-light flex-shrink-0 px-5 py-2 rounded-full cursor-pointer
+            text-gray-900
+           ${item.time === slotTime
+                  ? 'bg-indigo-600 text-white'
+                  : 'border border-gray-300 hover:bg-gray-100 transition'}`}
+            >
               {item.time.toLowerCase()}
             </p>
           ))}
@@ -201,19 +267,50 @@ const Appointment = () => {
         <button
           onClick={bookAppointment}
           disabled={!slotTime}
-          className={`bg-primary text-white text-sm font-light px-14 py-3 rounded-full my-6 ${!slotTime ? 'opacity-50 cursor-not-allowed' : ''
+          className={`bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-light px-14 py-3 rounded-full my-6 ${!slotTime ? 'opacity-50 cursor-not-allowed' : ''
             }`}
         >
           Book an appointment
         </button>
+        {/* Review Section */}
+        {isReviewMode && canReview && (
+          <Review
+            canReview={true}
+            appointmentId={appointmentId}
+            doctorId={docId}
+            onReviewSubmit={fetchDoctorReviews}
+          />
+        )}
 
-
+        {/* Public Reviews — Sab dekh sakte hain */}
+        <Review
+          readOnly={true}
+          reviewData={doctorReviews}
+          summary={reviewSummary}
+          onReviewSubmit={fetchDoctorReviews}
+        />
       </div>
       {/* Related Doctors */}
       <RelatedDoctors docId={docId} speciality={docInfo.speciality} />
 
+      {showChat && (
+        <div className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'>
+          <div className='w-full max-w-md'>
+            <ChatWindow
+              appointmentId={`chat_${docId}_${userData._id}`}
+              doctorId={docId}  
+              doctorName={docInfo.name}
+              doctorImage={docInfo.image}
+              onClose={() => setShowChat(false)}
+            />
+          </div>
+        </div>
+      )}
+
     </div>
   )
+
+
 }
 
 export default Appointment

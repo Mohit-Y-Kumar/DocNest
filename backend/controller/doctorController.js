@@ -235,6 +235,55 @@ const updateDoctorProfile = async (req, res) => {
     }
 };
 
+/// api for view
+const incrementView = async (req, res) => {
+    try {
+        const { docId } = req.params;
+        const doctor = await doctorModel.findByIdAndUpdate(
+            docId,
+            { $inc: { views: 1 } },  // views + 1
+            { new: true }
+        );
+        res.json({ success: true, views: doctor.views });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+//api for like and unlike 
+const toggleLike = async (req, res) => {
+    try {
+        const { docId } = req.params;
+        const userId = req.userId; 
+        const doctor = await doctorModel.findById(docId);
+        if (!doctor) {
+            return res.json({ success: false, message: 'Doctor nahi mila' });
+        }
+
+        const alreadyLiked = doctor.likedBy.includes(userId);
+
+        if (alreadyLiked) {
+            
+            await doctorModel.findByIdAndUpdate(docId, {
+                $inc: { likes: -1 },
+                $pull: { likedBy: userId }
+            });
+            return res.json({ success: true, liked: false, message: 'Like remove ho gaya' });
+        } else {
+            
+            await doctorModel.findByIdAndUpdate(docId, {
+                $inc: { likes: 1 },
+                $push: { likedBy: userId }
+            });
+            return res.json({ success: true, liked: true, message: 'Like ho gaya!' });
+        }
+
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+
 export {
     changeAvailablity,
     doctorList,
@@ -244,5 +293,7 @@ export {
     appointmentComplete,
     doctorDashboard,
     doctorProfile,
-    updateDoctorProfile
+    updateDoctorProfile,
+    incrementView,
+    toggleLike
 }

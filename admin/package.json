@@ -16,6 +16,8 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.5",
     "react-toastify": "^11.0.5",
+    "simple-peer": "^9.11.1",
+    "socket.io-client": "^4.8.3",
     "tailwindcss": "^4.1.17"
   },
   "devDependencies": {

@@ -3,22 +3,56 @@ import { assets } from '../assets/assets'
 
 const Contact = () => {
   return (
-    <div className=''>
-      
-      <div className='text-center text-2xl pt-10 text-gray-500'>
-        <p>CONTACT <span className='text-gray-700 font-semibold'>US</span></p>
+    <div className='md:mx-10'>
+
+      {/* Heading */}
+      <div className='text-center text-3xl pt-12 text-gray-600'>
+        <p>CONTACT <span className='text-gray-900 font-semibold'>DOCNEST</span></p>
       </div>
 
-      <div className='my-10 flex flex-col justify-center md:flex-row gap-10'>
-        <img className='w-full md:max-w-[360px]' src={assets.contact_image} alt="" />
-        <div className='flex flex-col justify-center items-start gap-6'>
-          <p className='font-semibold text-lg text-gray-600'>Our OFFICE</p>
-          <p className='text-gray-500'>546 Gaur 5th Flor <br /> Noida Sector 122</p>
-          <p className='text-gray-500'>Tel: (434) 555-434 <br /> Email: Jes@gmail.com</p>
-          <p className='font-semibold text-lg text-gray-600'>Careers at PRESCRIPTO</p>
-          <p className='text-gray-500'> Learn more about our teams and job openings..</p>
-          <button className=' border border-black px-8 py-4 text-sm hover:bg-black hover:text-white transition-all duration-300'>Explore Jobs</button>
+      {/* Content */}
+      <div className='my-12 flex flex-col md:flex-row items-center gap-12'>
+
+        {/* Image */}
+        <img 
+          className='w-full md:max-w-[420px] rounded-xl shadow-md' 
+          src={assets.contact_image} 
+          alt="contact" 
+        />
+
+        {/* Info */}
+        <div className='flex flex-col justify-center items-start gap-6 text-gray-600'>
+
+          <div>
+            <p className='font-semibold text-lg text-gray-800'>Our Office</p>
+            <p className='text-gray-500 mt-2 leading-6'>
+              546, Gaur City, 5th Floor <br /> 
+              Noida, Sector 122, India
+            </p>
+          </div>
+
+          <div>
+            <p className='font-semibold text-lg text-gray-800'>Contact Info</p>
+            <p className='text-gray-500 mt-2 leading-6'>
+              Tel: +91 98765 43210 <br /> 
+              Email: support@docnest.com
+            </p>
+          </div>
+
+          <div>
+            <p className='font-semibold text-lg text-gray-800'>Careers at DocNest</p>
+            <p className='text-gray-500 mt-2'>
+              Join our team and help us build the future of healthcare.
+            </p>
+          </div>
+
+          <button className='mt-2 border border-gray-800 px-8 py-3 text-sm rounded-full 
+          hover:bg-gray-900 hover:text-white transition-all duration-300 shadow-sm hover:shadow-md'>
+            Explore Jobs →
+          </button>
+
         </div>
+
       </div>
 
     </div>

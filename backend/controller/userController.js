@@ -8,8 +8,8 @@ import doctorModel from "../models/doctorModel.js";
 import appointmentModel from "../models/appointmentModel.js";
 import Razorpay from "razorpay";
 
-
-
+import crypto from 'crypto'
+import paymentModel from '../models/paymentModel.js'
 
 const registerUser = async (req, res) => {
 
@@ -193,7 +193,7 @@ const bookAppointment = async (req, res) => {
         //save new slot data in doctor data
 
         await doctorModel.findByIdAndUpdate(docId, { slots_booked })
-        res.json({ success: true, message: 'appointment booked' })
+        res.json({ success: true, message: 'appointment booked', appointmentId: newAppointment._id })
 
 
     } catch (error) {
@@ -291,77 +291,106 @@ const razorpayInstance = new Razorpay({
 //API  to make payment of user appointment
 
 const paymentRazorpay = async (req, res) => {
-
     try {
         const { appointmentId } = req.body;
-
-        const appointmentData = await appointmentModel.findById(appointmentId)
-
+        console.log('appointmentId:', appointmentId)           // ← check
+        console.log('KEY_ID:', process.env.RAZORPAY_KEY_ID)   // ← check
+        console.log('CURRENCY:', process.env.CURRENCY)
+        const appointmentData = await appointmentModel.findById(appointmentId);
+        console.log('appointmentData:', appointmentData)
         if (!appointmentData || appointmentData.cancelled) {
-            return res.json({ success: false, message: "Appointment Cancelled or not found" })
+            return res.json({ success: false, message: "Appointment cancelled or not found" });
         }
 
-        // creating options for razorpay payments
+        const existingPayment = await paymentModel.findOne({ appointmentId });
 
+        let order;
 
-        const options = {
-            amount: Number(appointmentData.amount) * 100,
-
-            currency: process.env.currency,
-            receipt: appointmentId.toString(),
-
-        }
-
-        // creation of an order
-        const order = await razorpayInstance.orders.create(options)
-        console.log("RAZORPAY ORDER:", order);
-        res.json({ success: true, order })
-
-
-    }
-    catch (error) {
-        console.log("RAZORPAY ERROR:", error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-        });
-    }
-
-}
-
-// api to verify payment of razorpay
-
-const verifyRazorpay = async (req, res) => {
-    try {
-
-       const { razorpay_order_id } = req.body.response;
-
-        const orderInfo = await razorpayInstance.orders.fetch(razorpay_order_id)
-
-        if (orderInfo.status === 'paid') {
-            await appointmentModel.findByIdAndUpdate(orderInfo.receipt,
-                { payment: true }
-            );
-            res.json({ success: true, message: "Payment Successful" });
-
+        if (existingPayment) {
+            // ✅ Purana order use karo — naya mat banao
+            order = await razorpayInstance.orders.fetch(existingPayment.razorpay_order_id);
         } else {
-            res.json({ success: false, message: "Payment failed" });
+            const options = {
+                amount: Number(appointmentData.amount) * 100,
+                currency: process.env.CURRENCY,
+                receipt: appointmentId.toString(),
+            };
 
+             order = await razorpayInstance.orders.create(options);
+
+            // ✅ Order create hote hi DB mein save karo
+            await paymentModel.create({
+                appointmentId: appointmentId,
+                userId: appointmentData.userId,
+                razorpay_order_id: order.id,
+                amount: appointmentData.amount,
+                status: 'created'
+            });
         }
-
-
-
+        res.json({ success: true, order });
 
     } catch (error) {
         console.log("RAZORPAY ERROR:", error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-        });
+        return res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+// Step 2 — Verify karo
+const verifyRazorpay = async (req, res) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body.response;
+        console.log('order_id:', razorpay_order_id)
+        console.log('payment_id:', razorpay_payment_id)
+        console.log('signature:', razorpay_signature)
+        console.log('KEY_SECRET exists:', !!process.env.RAZORPAY_KEY_SECRET)
+        console.log('KEY_SECRET value:', process.env.RAZORPAY_KEY_SECRET)
+        // ✅ Signature verify karo
+        const body = razorpay_order_id + "|" + razorpay_payment_id;
+        const expectedSignature = crypto
+            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+            .update(body)
+            .digest('hex');
+        console.log('expected:', expectedSignature)
+        console.log('received:', razorpay_signature)
+        console.log('match:', expectedSignature === razorpay_signature)
+        if (expectedSignature !== razorpay_signature) {
+            // ❌ Fake payment — status failed karo
+            await paymentModel.findOneAndUpdate(
+                { razorpay_order_id },
+                { status: 'failed' }
+            );
+            return res.json({ success: false, message: "Payment verification failed" });
+        }
+
+        // ✅ Sahi payment — dono update karo
+        const orderInfo = await razorpayInstance.orders.fetch(razorpay_order_id);
+
+        await appointmentModel.findByIdAndUpdate(orderInfo.receipt, { payment: true });
+
+        await paymentModel.findOneAndUpdate(
+            { razorpay_order_id },
+            {
+                razorpay_payment_id,
+                razorpay_signature,
+                status: 'paid'
+            }
+        );
+
+        res.json({ success: true, message: "Payment Successful" });
+
+    } catch (error) {
+        console.log("RAZORPAY ERROR:", error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 }
 
 
 
 
-export { registerUser, loginUser, getProfile, updateProfile, bookAppointment, listAppointment, cancelAppointment, paymentRazorpay, verifyRazorpay }
+export {
+    registerUser,
+    loginUser, getProfile,
+    updateProfile, bookAppointment,
+    listAppointment, cancelAppointment,
+    paymentRazorpay, verifyRazorpay
+}
