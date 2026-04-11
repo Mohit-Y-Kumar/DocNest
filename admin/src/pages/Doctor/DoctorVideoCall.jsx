@@ -120,7 +120,7 @@ const DoctorVideoCall = ({
 
 
 
-    // Local stream
+    // ✅ Local video
     useEffect(() => {
         const startLocalStream = async () => {
             try {
@@ -129,22 +129,37 @@ const DoctorVideoCall = ({
                     return
                 }
 
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: callType === 'video',
-                    audio: true
-                })
+                let stream;
+
+                try {
+                    // ✅ Pehle video + audio try karo
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: callType === 'video',
+                        audio: true
+                    })
+                } catch (err) {
+                    // ✅ Camera busy — sirf audio try karo
+                    console.warn('Camera busy — audio only')
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: false,
+                        audio: true
+                    })
+                }
+
                 setLocalStream(stream)
                 streamRef.current = stream
-                if (localVideoRef.current) {
+
+                if (localVideoRef.current && stream.getVideoTracks().length > 0) {
                     localVideoRef.current.srcObject = stream
                 }
+
             } catch (err) {
                 if (err.name === 'NotAllowedError') {
                     setError('Camera/Mic permission do')
                 } else if (err.name === 'NotFoundError') {
                     setError('Camera/Mic nahi mila')
                 } else {
-                    setError('Camera/Mic access nahi mila — HTTPS use karo')
+                    setError(`Error: ${err.message}`)
                 }
             }
         }

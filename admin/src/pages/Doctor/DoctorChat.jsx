@@ -16,7 +16,7 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
     const socketRef = useRef(null)
     const messagesEndRef = useRef(null)
     const typingTimeoutRef = useRef(null)
-
+    const [callType, setCallType] = useState('audio')
     const [selectedImage, setSelectedImage] = useState(null)
     const [isCalling, setIsCalling] = useState(false)
     // Same room ID — jo patient ne use kiya
@@ -27,8 +27,12 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
 
     useEffect(() => {
         // ✅ Connect karo
-        socketRef.current = io(backendUrl)
-
+        socketRef.current = io(backendUrl, {
+            transports: ['websocket', 'polling'],
+            extraHeaders: {
+                'ngrok-skip-browser-warning': 'true'
+            }
+        })
         socketRef.current.on('connect', () => {
             setConnected(true)
             console.log('✅ Doctor Socket connected')
@@ -63,7 +67,7 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
             setIsTyping(false)
         })
         socketRef.current.on('incoming-call', (data) => {
-            socketRef.current.emit('join-room', data.roomId) 
+            socketRef.current.emit('join-room', data.roomId)
             setIncomingCallData(data)
             setIsCalling(false)
             setShowVideoCall(true)
@@ -82,8 +86,7 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
     useEffect(() => {
         const loadHistory = async () => {
             try {
-                const res = await fetch(`${backendUrl}/api/chat/history/${roomId}`)
-                const data = await res.json()
+                const { data } = await axios.get(`${backendUrl}/api/chat/history/${roomId}`)
                 if (data.success) setMessages(data.messages)
                 await axios.put(
                     backendUrl + `/api/chat/mark-read/${roomId}`,
@@ -200,13 +203,25 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
 
                 <button
                     onClick={() => {
+                        setCallType('audio')  // ✅ audio
                         setIsCalling(true)
                         setShowVideoCall(true)
                     }}
-                    className='text-white text-lg ml-2'
-                    title="Call Patient"
+                    className='w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition'
+                    title="Audio Call"
                 >
                     📞
+                </button>
+                <button
+                    onClick={() => {
+                        setCallType('video')  // ✅ video
+                        setIsCalling(true)
+                        setShowVideoCall(true)
+                    }}
+                    className='w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition'
+                    title="Video Call"
+                >
+                    📹
                 </button>
                 {onClose && (
                     <button
@@ -311,7 +326,7 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
                         socketRef={socketRef}
                         roomId={`call_${docId}_${patientId}`}
 
-                        callType={incomingCallData?.callType || 'video'}
+                        callType={incomingCallData?.callType || callType}
 
                         // ✅ dynamic role
                         isInitiator={isCalling}

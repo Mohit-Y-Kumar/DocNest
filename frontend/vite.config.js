@@ -8,9 +8,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    allowedHosts: [
-      'fitting-readily-meanwhile-arm.trycloudflare.com'
-    ],
+    
   },
   define: {
     global: 'window',

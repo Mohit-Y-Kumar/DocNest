@@ -2,8 +2,10 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
 
-@theme{
-    --color-primary:#5F6FFF
+@theme {
+  --color-primary: #5F6FFF;
+  --color-brand-dark: #1A1F5E;
+  --color-brand-pink: #FF6B8A;
 }
 
 ::-webkit-scrollbar{

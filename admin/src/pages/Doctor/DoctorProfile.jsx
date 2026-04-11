@@ -15,38 +15,7 @@ const DoctorProfile = () => {
   } = useContext(DoctorContext)
   const { currency, } = useContext(AppContext)
   const [isEdit, setIsEdit] = useState(false)
-
-  const updateProfile = async () => {
-    try {
-
-      const UpdateData = {
-        address: profileData.address,
-        fees: profileData.fees,
-        available: profileData.available
-      }
-
-      const { data } = await axios.post(
-        backendUrl + '/api/doctor/update-profile',
-        UpdateData,
-        {
-          headers: { 'Authorization': `Bearer ${dToken}` }
-        })
-
-      if (data.success) {
-        toast.success(data.message);
-
-        setIsEdit(false)
-        getProfileData()
-      } else {
-        toast.error(data.message);
-      }
-
-    } catch (error) {
-      console.log(error);
-      toast.error(error.message);
-    }
-  }
-
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (dToken) {
@@ -54,70 +23,196 @@ const DoctorProfile = () => {
     }
   }, [dToken])
 
-  return profileData && (
-    <div>
+  const updateProfile = async () => {
+    try {
+      setSaving(true)
 
-      <div className='flex flex-col gap-4 m-5'>
-        <div>
-          <img className='bg-primary/80 w-full sm:max-w-64  rounded-lg ' src={profileData.image} alt="" />
+      const { data } = await axios.post(
+        backendUrl + '/api/doctor/update-profile',
+        {
+          address: profileData.address,
+          fees: profileData.fees,
+          available: profileData.available
+        },
+        {
+          headers: { Authorization: `Bearer ${dToken}` }
+        }
+      )
+
+      if (data.success) {
+        toast.success(data.message)
+        setIsEdit(false)
+        getProfileData()
+      } else {
+        toast.error(data.message)
+      }
+
+    } catch (error) {
+      console.log(error)
+      toast.error(error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+
+
+  if (!profileData) {
+    return <div className="ml-0 md:ml-64 p-5">Loading...</div>
+  }
+  return profileData && (
+
+    <div className='ml-24 md:ml-64 p-4 sm:p-5 space-y-5 max-w-5xl mx-auto min-h-screen'>
+
+      {/* ── Profile Card ── */}
+      <div className='bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden'>
+
+        {/* Banner */}
+        <div className='h-10 sm:h-12 bg-gradient-to-r from-[#5F6FFF] to-[#8B94FF] relative'>
+          {/* decorative dots */}
+          <div className='absolute inset-0 opacity-10'
+            style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }}
+          />
         </div>
 
-        <div className='flex-1 border p-8 py-7 border-stone-100 bg-white'>
-          {/* doc info name degree experience */}
-          <p className='flex items-center gap-2 text-3xl font-medium text-gray-700'>{profileData.name}</p>
-          <div className='flex items-center gap-2 mt-1 text-gray-600'>
-            <p> {profileData.degree} - {profileData.speciality}</p>
-            <button className='py-0.5 px-2 border text-xs rounded-full'>{profileData.experience} </button>
+        {/* Avatar + name row */}
+        <div className='px-4 sm:px-6 md:px-8 sm pb-6'>
+          <div className='flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-12 sm:-mt-14 mb-5'>
+            <div className='flex items-end gap-4 mt-16 sm:mt-20'>
+              <img
+                className='w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl object-cover border-4 border-white shadow-md ring-2 ring-[#eef0ff]'
+                src={profileData.image}
+                alt={profileData.name}
+              />
+              <div className='mb-1'>
+                <h2 className='text-lg sm:text-xl md:text-2xl font-bold text-[#1A1F5E] leading-tight'>{profileData.name}</h2>
+                <p className='text-sm text-gray-500 mt-0.5'>{profileData.degree} · {profileData.speciality}</p>
+                <span className='inline-block mt-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#eef0ff] text-[#5F6FFF]'>
+                  {profileData.experience}
+                </span>
+              </div>
+            </div>
+
+            {/* Edit / Save button */}
+            <div className='flex flex-col sm:flex-row gap-2 w-full sm:w-auto'>
+              {isEdit ? (
+                <>
+                  <button
+                    onClick={() => setIsEdit(false)}
+                    className='px-4 py-2 text-sm rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 transition'
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={updateProfile}
+                    disabled={saving}
+                    className='w-full sm:w-auto  px-5 py-2 text-sm rounded-full bg-[#5F6FFF] text-white font-semibold hover:bg-[#4a5aee] transition disabled:opacity-60'
+                  >
+                    {saving ? 'Saving…' : 'Save Changes'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setIsEdit(true)}
+                  className='px-5 py-2 text-sm rounded-full border-2 border-[#5F6FFF] text-[#5F6FFF] font-semibold hover:bg-[#5F6FFF] hover:text-white transition'
+                >
+                  ✏️ Edit Profile
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* doc about  */}
-          <p className='flex items-center gap-1 text-sm font-medium text-neutral-800 mt-3'>About:</p>
-          <p className='text-sm text-gray-600 max-w-[700px] mt-1'>{profileData.about}</p>
+          {/* About */}
+          <div className='mb-5'>
+            <p className='text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1.5'>About</p>
+            <p className='text-sm text-gray-600 leading-relaxed max-w-2xl'>{profileData.about}</p>
+          </div>
+
+          {/* Divider */}
+          <div className='border-t border-gray-100 my-5' />
+
+          {/* Info Grid */}
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5'>
+
+            {/* Consultation Fee */}
+            <div>
+              <p className='text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2'>Consultation Fee</p>
+              <div className='flex items-center gap-2'>
+                <span className='w-8 h-8 rounded-lg bg-[#eef0ff] flex items-center justify-center text-sm'>💰</span>
+                {isEdit ? (
+                  <input
+                    type='number'
+                    value={profileData.fees}
+                    onChange={e => setProfileData(prev => ({ ...prev, fees: e.target.value }))}
+                    className='border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-full sm:w-32 focus:outline-none focus:border-[#5F6FFF] focus:ring-1 focus:ring-[#5F6FFF]'
+                  />
+                ) : (
+                  <span className='text-lg font-bold text-[#1A1F5E]'>{currency}{profileData.fees}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Availability */}
+            <div>
+              <p className='text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2'>Availability</p>
+              <label className={`inline-flex items-center gap-3 cursor-pointer px-4 py-2 rounded-xl border-2 transition-all ${profileData.available ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+                <div className='relative'>
+                  <input
+                    type='checkbox'
+                    checked={profileData.available}
+                    onChange={() => isEdit && setProfileData(prev => ({ ...prev, available: !prev.available }))}
+                    className='sr-only'
+                    disabled={!isEdit}
+                  />
+                  <div className={`w-10 h-5 rounded-full transition-colors ${profileData.available ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${profileData.available ? 'translate-x-5' : 'translate-x-0'}`} />
+                </div>
+                <span className={`text-sm font-semibold ${profileData.available ? 'text-green-600' : 'text-gray-400'}`}>
+                  {profileData.available ? 'Available for Booking' : 'Not Available'}
+                </span>
+              </label>
+              {!isEdit && (
+                <p className='text-xs text-gray-400 mt-1.5'>Enable edit mode to change availability</p>
+              )}
+            </div>
+
+            {/* Address Line 1 */}
+            <div>
+              <p className='text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2'>Address Line 1</p>
+              <div className='flex items-center gap-2'>
+                <span className='w-8 h-8 rounded-lg bg-[#eef0ff] flex items-center justify-center text-sm flex-shrink-0'>📍</span>
+                {isEdit ? (
+                  <input
+                    type='text'
+                    value={profileData.address?.line1 || ""}
+                    onChange={e => setProfileData(prev => ({ ...prev, address: { ...(prev.address || {}), line1: e.target.value } }))}
+                    className='border border-gray-200 rounded-lg px-3 py-1.5 text-sm flex-1 focus:outline-none focus:border-[#5F6FFF] focus:ring-1 focus:ring-[#5F6FFF]'
+                  />
+                ) : (
+                  <span className='text-sm text-gray-700'>{profileData.address?.line1}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Address Line 2 */}
+            <div>
+              <p className='text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2'>Address Line 2</p>
+              <div className='flex items-center gap-2'>
+                <span className='w-8 h-8 rounded-lg bg-[#eef0ff] flex items-center justify-center text-sm flex-shrink-0'>🏢</span>
+                {isEdit ? (
+                  <input
+                    type='text'
+                    value={profileData.address?.line2 || ""}
+                    onChange={e => setProfileData(prev => ({ ...prev, address: { ...prev.address, line2: e.target.value } }))}
+                    className='border border-gray-200 rounded-lg px-3 py-1.5 text-sm flex-1 focus:outline-none focus:border-[#5F6FFF] focus:ring-1 focus:ring-[#5F6FFF]'
+                  />
+                ) : (
+                  <span className='text-sm text-gray-700'>{profileData.address?.line2 || '—'}</span>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-
-        <p className='text-gray-600 font-medium mt-4'>
-          Appointment fees: <span className='text-gray-800'> {currency} {isEdit ? <input type="number" onChange={(e) => setProfileData(prev => ({ ...prev, fees: e.target.value }))} value={profileData.fees} /> : profileData.fees} </span>
-        </p>
-        <div className='flex gap-2 py-2'>
-          <p>Address:</p>
-          <p className='text-sm'>
-            {isEdit ? <input type="text" onChange={(e) =>
-              setProfileData(prev => ({
-                ...prev,
-                address: {
-                  ...prev.address,
-                  line1: e.target.value
-                }
-              }))
-            }
-              value={profileData.address.line1} /> :
-              profileData.address?.line1}
-            <br />
-            {isEdit ? <input type="text" onChange={(e) =>
-              setProfileData(prev => ({
-                ...prev,
-                address: {
-                  ...prev.address,
-                  line2: e.target.value
-                }
-              }))
-            } value={profileData.address.line2} /> :
-              profileData.address?.line2}
-
-
-          </p>
-
-        </div>
-        <div className='flex gap-1 pt-2'>
-          <input onChange={() => isEdit && setProfileData(prev => ({ ...prev, available: !prev.available }))} checked={profileData.available} type="checkbox" name="" id="" />
-          <label htmlFor="">Available </label>
-        </div>
-        {
-          isEdit
-            ? <button onClick={updateProfile} className='px-4 py-1 border border-primary text-sm rounded-full mt-5 hover:bg-primary hover:text-white transition-all'>Save</button>
-            : <button onClick={() => setIsEdit(true)} className='px-4 py-1 border border-primary text-sm rounded-full mt-5 hover:bg-primary hover:text-white transition-all'>Edit</button>
-        }
-
       </div>
     </div>
   )

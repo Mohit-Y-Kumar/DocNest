@@ -36,7 +36,12 @@ const VideoCall = ({
 
     // ✅ Socket connect
     useEffect(() => {
-        socketRef.current = io(backendUrl)
+        socketRef.current = io(backendUrl, {
+            transports: ['websocket', 'polling'],
+            extraHeaders: {
+                'ngrok-skip-browser-warning': 'true'
+            }
+        })
 
         socketRef.current.on('connect', () => {
             socketRef.current.emit('join-room', roomId)
@@ -127,23 +132,38 @@ const VideoCall = ({
                     setError('Camera/Mic supported nahi — HTTPS use karo ya localhost pe chalao')
                     return
                 }
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: callType === 'video',
-                    audio: true
-                })
+
+                let stream;
+
+                try {
+                    // ✅ Pehle video + audio try karo
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: callType === 'video',
+                        audio: true
+                    })
+                } catch (err) {
+                    // ✅ Camera busy — sirf audio try karo
+                    console.warn('Camera busy — audio only')
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: false,
+                        audio: true
+                    })
+                }
+
                 setLocalStream(stream)
                 streamRef.current = stream
-                if (localVideoRef.current) {
+
+                if (localVideoRef.current && stream.getVideoTracks().length > 0) {
                     localVideoRef.current.srcObject = stream
                 }
+
             } catch (err) {
-                console.error('Camera error:', err)
                 if (err.name === 'NotAllowedError') {
-                    setError('Camera/Mic permission do — browser settings mein allow karo')
+                    setError('Camera/Mic permission do')
                 } else if (err.name === 'NotFoundError') {
-                    setError('Camera/Mic nahi mila device pe')
+                    setError('Camera/Mic nahi mila')
                 } else {
-                    setError('Camera/Mic access nahi mila — HTTPS use karo')
+                    setError(`Error: ${err.message}`)
                 }
             }
         }

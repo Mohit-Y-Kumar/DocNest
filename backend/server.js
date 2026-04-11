@@ -25,7 +25,8 @@ const httpServer = createServer(app)
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['ngrok-skip-browser-warning'] 
   }
 })
 
@@ -37,7 +38,12 @@ connectCloudinary()
 
 // Middleware
 app.use(express.json());
-app.use(cors())
+// ✅ server.js mein CORS update karo
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning']  // ✅ ye add karo
+}))
 
 // API endpoints
 app.use('/api/admin', adminRouter)
@@ -86,7 +92,7 @@ io.on('connection', (socket) => {
         )
       }
       //notify to doctor 
-      io.to(data.roomId).emit('incoming-call', {
+      socket.to(data.roomId).emit('incoming-call', {
         roomId: data.roomId,
         callerName: data.callerName,
         callerImage: data.callerImage,
@@ -99,43 +105,43 @@ io.on('connection', (socket) => {
     }
   })
 
-socket.on('call-accepted', async (data) => {
+  socket.on('call-accepted', async (data) => {
     await callModel.findOneAndUpdate(
-        { roomId: data.roomId },
-        { status: 'accepted', startedAt: new Date() }
+      { roomId: data.roomId },
+      { status: 'accepted', startedAt: new Date() }
     )
     // ✅ socket.to — sender ko nahi, baaki sab ko
     socket.to(data.roomId).emit('call-accepted', {
-        roomId: data.roomId
+      roomId: data.roomId
     })
-})
- socket.on('call-rejected', async (data) => {
+  })
+  socket.on('call-rejected', async (data) => {
     await callModel.findOneAndUpdate(
-        { roomId: data.roomId },
-        { status: 'rejected' }
+      { roomId: data.roomId },
+      { status: 'rejected' }
     )
     socket.to(data.roomId).emit('call-rejected', {  // ✅ socket.to
-        roomId: data.roomId
+      roomId: data.roomId
     })
-})
+  })
 
   socket.on('call-ended', async (data) => {
     const call = await callModel.findOne({ roomId: data.roomId })
     if (call) {
-        call.status  = 'ended'
-        call.endedAt = new Date()
-        await call.save()
+      call.status = 'ended'
+      call.endedAt = new Date()
+      await call.save()
     }
     socket.to(data.roomId).emit('call-ended', {  // ✅ socket.to
-        roomId: data.roomId
+      roomId: data.roomId
     })
-})
+  })
 
- socket.on('signal', (data) => {
+  socket.on('signal', (data) => {
     socket.to(data.roomId).emit('signal', {  // ✅ socket.to
-        signalData: data.signalData
+      signalData: data.signalData
     })
-})
+  })
 
   socket.on('message-read', async (data) => {
     console.log('Message read:', data)

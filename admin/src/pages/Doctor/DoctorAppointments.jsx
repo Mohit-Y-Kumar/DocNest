@@ -1,5 +1,4 @@
-import React, { useContext, useState } from 'react'
-import { useEffect } from 'react'
+import React, { useContext, useState, useEffect } from 'react'
 import { DoctorContext } from '../../context/DoctorContext'
 import { AppContext } from '../../context/AppContext'
 import { assets } from '../../assets/assets'
@@ -12,6 +11,7 @@ const DoctorAppointments = () => {
 
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [showChat, setShowChat] = useState(false)
+  const [filter, setFilter] = useState('all')
 
   useEffect(() => {
     if (dToken) {
@@ -19,84 +19,168 @@ const DoctorAppointments = () => {
     }
   }, [dToken])
 
+  const filtered = appointments.filter(a => {
+    if (filter === 'pending') return !a.cancelled && !a.isCompleted
+    if (filter === 'completed') return a.isCompleted
+    if (filter === 'cancelled') return a.cancelled
+    return true
+  })
+  const counts = {
+    all: appointments.length,
+    pending: appointments.filter(a => !a.cancelled && !a.isCompleted).length,
+    completed: appointments.filter(a => a.isCompleted).length,
+    cancelled: appointments.filter(a => a.cancelled).length,
+  }
+
+  const filterTabs = [
+    { key: 'all', label: 'All', color: 'bg-[#5F6FFF] text-white', inactive: 'text-[#5F6FFF] bg-[#eef0ff]' },
+    { key: 'pending', label: 'Pending', color: 'bg-amber-500 text-white', inactive: 'text-amber-600 bg-amber-50' },
+    { key: 'completed', label: 'Completed', color: 'bg-green-500 text-white', inactive: 'text-green-600 bg-green-50' },
+    { key: 'cancelled', label: 'Cancelled', color: 'bg-red-500 text-white', inactive: 'text-red-500 bg-red-50' },
+  ]
   return (
-    <div className='w-full max-w-6xl m-5'>
-      <p className='mb-3 text-lg font-medium'>All Appointments</p>
+    <div className='ml-24 md:ml-64 m-5 space-y-5'>
 
-      <div className='bg-white border rounded text-sm max-h-[80vh] min-h-[50vh] overflow-y-scroll'>
-
-        {/* Header */}
-        <div className='max-sm:hidden grid grid-cols-[0.5fr_2fr_1fr_1fr_3fr_1fr_1fr_1fr] gap-1 py-3 px-6 border-b'>
-          <p>#</p>
-          <p>Patient</p>
-          <p>Payment</p>
-          <p>Age</p>
-          <p>Date & Time</p>
-          <p>Fees</p>
-          <p>Action</p>
-          <p>Chat</p>
+      {/* ── Page Title ── */}
+      <div className='  flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
+        <div>
+          <h1 className='text-xl font-bold text-[#1A1F5E]'>All Appointments</h1>
+          <p className='text-xs text-gray-400 mt-0.5'>{appointments.length} total records</p>
         </div>
 
+        {/* Filter Tabs */}
+        <div className='flex flex-wrap gap-2'>
+          {filterTabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${filter === tab.key ? tab.color : tab.inactive}`}
+            >
+              {tab.label}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${filter === tab.key ? 'bg-white/25' : 'bg-white'}`}>
+                {counts[tab.key]}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Table Card ── */}
+      <div className='bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden'>
+
+        {/* Desktop Header */}
+        <div className='hidden lg:grid grid-cols-[0.4fr_2fr_1fr_0.7fr_2.2fr_1fr_1fr_0.8fr] gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider'>
+          <span>#</span>
+          <span>Patient</span>
+          <span>Payment</span>
+          <span>Age</span>
+          <span>Date & Time</span>
+          <span>Fees</span>
+          <span>Action</span>
+          <span>Chat</span>
+        </div>
+
+        {/* Empty State */}
+        {filtered.length === 0 && (
+          <div className='flex flex-col items-center justify-center py-16 text-center'>
+            <div className='w-14 h-14 rounded-full bg-[#eef0ff] flex items-center justify-center mb-3'>
+              <img className='w-7' src={assets.appointments_icon} alt='' />
+            </div>
+            <p className='text-sm font-medium text-gray-500'>No {filter} appointments</p>
+            <p className='text-xs text-gray-400 mt-1'>Try a different filter</p>
+          </div>
+        )}
+
         {/* Rows */}
-        {appointments.map((item, index) => (
-          <div
-            className='flex flex-wrap justify-between max-sm:gap-5 max-sm:text-base sm:grid sm:grid-cols-[0.5fr_2fr_1fr_1fr_3fr_1fr_1fr_1fr] gap-1 items-center text-gray-500 py-3 px-6 border-b hover:bg-gray-50'
-            key={index}
-          >
-            <p className='max-sm:hidden'>{index + 1}</p>
+        <div className='divide-y divide-gray-50 max-h-[65vh] overflow-y-auto'>
+          {filtered.map((item, index) => (
+            <div
+              key={index}
+              className='flex flex-col gap-3 lg:grid lg:grid-cols-[0.4fr_2fr_1fr_0.7fr_2.2fr_1fr_1fr_0.8fr] lg:gap-2 items-start lg:items-center px-5 py-4 hover:bg-[#f9f9ff] transition-colors'
+            >
+              {/* Index */}
+              <p className='hidden lg:block text-sm text-gray-400 font-medium'>{index + 1}</p>
 
-            <div className='flex items-center gap-2'>
-              <img className='w-8 rounded-full' src={item.userData.image} alt="" />
-              <p>{item.userData.name}</p>
-            </div>
+              {/* Patient */}
+              <div className='flex items-center gap-3'>
+                <img
+                  className='w-9 h-9 rounded-full object-cover ring-2 ring-[#eef0ff] flex-shrink-0'
+                  src={item.userData.image}
+                  alt=''
+                />
+                <div>
+                  <p className='text-sm font-semibold text-gray-800'>{item.userData.name}</p>
+                  <p className='text-xs text-gray-400 lg:hidden'>{slotDateFormat(item.slotDate)}, {item.slotTime}</p>
+                </div>
+              </div>
 
-            <div>
-              <p className='text-sm inline border border-primary px-2 rounded-full'>
-                {item.payment ? 'Online' : 'CASH'}
+              {/* Payment */}
+              <div>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${item.payment ? 'bg-[#eef0ff] text-[#5F6FFF]' : 'bg-gray-100 text-gray-500'}`}>
+                  {item.payment ? 'Online' : 'Cash'}
+                </span>
+              </div>
+
+              {/* Age */}
+              <p className='hidden lg:block text-sm text-gray-500'>{calculateAge(item.userData.dob)} yrs</p>
+
+              {/* Date */}
+              <p className='hidden lg:block text-sm text-gray-500'>
+                {slotDateFormat(item.slotDate)}, <span className='font-medium text-gray-700'>{item.slotTime}</span>
               </p>
-            </div>
 
-            <p className='max-sm:hidden'>{calculateAge(item.userData.dob)}</p>
-            <p>{slotDateFormat(item.slotDate)}, {item.slotTime}</p>
-            <p>{currency} {item.amount}</p>
+              {/* Fees */}
+              <p className='text-sm font-semibold text-[#1A1F5E]'>{currency}{item.amount}</p>
 
-            {/* Action */}
-            {item.cancelled
-              ? <p className='text-red-400 text-sm font-medium'>Cancelled</p>
-              : item.isCompleted
-                ? <p className='text-green-500 text-sm font-medium'>Completed</p>
-                : <div className='flex'>
-                    <img onClick={() => cancelAppointment(item._id)} className='w-10 cursor-pointer' src={assets.cancel_icon} alt="" />
-                    <img onClick={() => completeAppointment(item._id)} className='w-10 cursor-pointer' src={assets.tick_icon} alt="" />
+              {/* Action */}
+              <div>
+                {item.cancelled ? (
+                  <span className='text-xs font-semibold px-3 py-1 rounded-full bg-red-50 text-red-500'>Cancelled</span>
+                ) : item.isCompleted ? (
+                  <span className='text-xs font-semibold px-3 py-1 rounded-full bg-green-50 text-green-600'>Completed</span>
+                ) : (
+                  <div className='flex gap-2'>
+                    <button
+                      onClick={() => cancelAppointment(item._id)}
+                      className='w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center transition'
+                      title='Cancel'
+                    >
+                      <img className='w-4 h-4' src={assets.cancel_icon} alt='cancel' />
+                    </button>
+                    <button
+                      onClick={() => completeAppointment(item._id)}
+                      className='w-8 h-8 rounded-full bg-green-50 hover:bg-green-100 flex items-center justify-center transition'
+                      title='Complete'
+                    >
+                      <img className='w-4 h-4' src={assets.tick_icon} alt='complete' />
+                    </button>
                   </div>
-            }
+                )}
+              </div>
 
-            {/* ✅ Chat Button */}
+              {/* Chat */}
               <button
                 onClick={() => {
-                  console.log('item:', item)
                   setSelectedPatient({
                     userId: item.userId,
-                    name:   item.userData.name,
-                    image:  item.userData.image,
-                    docId:  item.docId
+                    name: item.userData.name,
+                    image: item.userData.image,
+                    docId: item.docId
                   })
                   setShowChat(true)
                 }}
-                className='text-xs px-3 py-1 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-all'
+                className='flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-[#eef0ff] text-[#5F6FFF] hover:bg-[#5F6FFF] hover:text-white transition-all'
               >
                 💬 Chat
               </button>
-            
-
-          </div>
-        ))}
-
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* ✅ Chat Window */}
+      {/* ── Chat Modal ── */}
       {showChat && selectedPatient && (
-        <div className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'>
+        <div className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4'>
           <div className='w-full max-w-md'>
             <DoctorChat
               docId={selectedPatient.docId}
@@ -108,7 +192,6 @@ const DoctorAppointments = () => {
           </div>
         </div>
       )}
-
     </div>
   )
 }

@@ -27,8 +27,12 @@ const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose 
 
     useEffect(() => {
         // ✅ Connect karo
-        socketRef.current = io(backendUrl)
-
+        socketRef.current = io(backendUrl, {
+            transports: ['websocket', 'polling'],
+            extraHeaders: {
+                'ngrok-skip-browser-warning': 'true'
+            }
+        })
         socketRef.current.on('connect', () => {
             setConnected(true)
             console.log('✅ Socket connected')
