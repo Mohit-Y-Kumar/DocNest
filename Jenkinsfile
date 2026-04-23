@@ -88,6 +88,7 @@ pipeline {
                       --name backend \
                       --network ${NETWORK} \
                       -p 4000:4000 \
+                      --env-file /home/vagrant/DocNest/backend/.env \
                       ${BACKEND_IMAGE}
                     """
 
