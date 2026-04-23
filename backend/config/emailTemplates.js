@@ -82,7 +82,9 @@ export const appointmentCancelledTemplate = ({ userName, doctorName, slotDate, s
         <div style="background:#fef2f2;border-radius:12px;padding:20px;margin-bottom:24px;border:1px solid #fecaca;border-left:4px solid #dc2626">
           <table style="width:100%;font-size:14px;color:#334155;border-collapse:collapse">
             <tr>
-              <td style="padding:10px 0;color:#94a3b8;width:40%;border-bottom:1px solid #fee2e2">🩺 Doctor</td>
+              <td style="padding:10px 0;color:#94a3b8;border-bottom:1px solid #f1f5f9">
+              <img src="${process.env.DOC_ICON}" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" /> Doctor
+              </td>
               <td style="padding:10px 0;font-weight:600;border-bottom:1px solid #fee2e2">${doctorName}</td>
             </tr>
             <tr>
