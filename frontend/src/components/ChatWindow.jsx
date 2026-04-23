@@ -3,6 +3,9 @@ import { io } from 'socket.io-client'
 import { AppContext } from '../context/AppContext'
 import axios from 'axios'
 import VideoCall from './VideoCall'
+import { assets } from '../assets/assets'
+
+
 
 const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose }) => {
     const { backendUrl, userData } = useContext(AppContext)
@@ -11,193 +14,162 @@ const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose 
     const [input, setInput] = useState('')
     const [isTyping, setIsTyping] = useState(false)
     const [connected, setConnected] = useState(false)
-
-    const [isInitiator, setIsInitiator] = useState(false)
-
-    const [callType, setCallType] = useState(null)
-    const [showVideoCall, setShowVideoCall] = useState(false)
-
-    const [callRoomId, setCallRoomId] = useState(null)
-    const socketRef = useRef(null)
-    const messagesEndRef = useRef(null)
-    const typingTimeoutRef = useRef(null)
     const [selectedImage, setSelectedImage] = useState(null)
-    const roomId = appointmentId
-    console.log('Patient roomId:', roomId)
 
+    // Call state
+    const [showVideoCall, setShowVideoCall]       = useState(false)
+    const [callRoomId, setCallRoomId]             = useState(null)
+    const [callType, setCallType]                 = useState('audio')
+    const [isInitiator, setIsInitiator]           = useState(false)
+    const [initialIncomingCall, setInitialIncomingCall] = useState(null)  // doctor → user incoming call data
+
+    const socketRef        = useRef(null)
+    const messagesEndRef   = useRef(null)
+    const typingTimeoutRef = useRef(null)
+
+    const chatRoomId = appointmentId
+   // Unique call room for this user and doctor
+    const myCallRoomId = `call_${doctorId}_${userData?._id}`
+
+    // Setup socket connection
     useEffect(() => {
-        // ✅ Connect karo
-        socketRef.current = io(backendUrl, {
+        const socket = io(backendUrl, {
             transports: ['websocket', 'polling'],
-            extraHeaders: {
-                'ngrok-skip-browser-warning': 'true'
-            }
+            extraHeaders: { 'ngrok-skip-browser-warning': 'true' }
         })
-        socketRef.current.on('connect', () => {
+        socketRef.current = socket
+
+        socket.on('connect', () => {
             setConnected(true)
-            console.log('✅ Socket connected')
+            // Chat room join 
+            socket.emit('join-room', chatRoomId)
 
-            // Room join karo
-            socketRef.current.emit('join-room', roomId)
 
-            socketRef.current.emit('message-read', {
-                roomId,
-                readBy: userData?._id
-            })
+            //  Join the call room first so you can receive incoming calls from the doctor
+            socket.emit('join-room', myCallRoomId)
+            socket.emit('message-read', { roomId: chatRoomId, readBy: userData?._id })
+            console.log('[ChatWindow] Joined rooms:', chatRoomId, myCallRoomId)
         })
 
-        socketRef.current.on('message-seen', (data) => {
+        // Update message read status
+        socket.on('message-seen', (data) => {
             setMessages(prev => prev.map(msg =>
-                msg.sender === userData?._id  // apne messages update karo
+                msg.sender === userData?._id
                     ? { ...msg, isRead: true, readAt: data.readAt }
                     : msg
             ))
         })
 
-        // Message receive karo
-        socketRef.current.on('receive-message', (data) => {
-
-            console.log('Received message:', data)
+        socket.on('receive-message', (data) => {
             setMessages(prev => [...prev, data])
-
-
         })
 
-        // Typing
-        socketRef.current.on('user-typing', () => {
-            setIsTyping(true)
-        })
+        // Typing indicators
+        socket.on('user-typing',      () => setIsTyping(true))
+        socket.on('user-stop-typing', () => setIsTyping(false))
+        socket.on('disconnect',       () => setConnected(false))
 
-        socketRef.current.on('user-stop-typing', () => {
-            setIsTyping(false)
-        })
+        //  Doctor call to  user 
+        socket.on('incoming-call', (data) => {
+            console.log('[ChatWindow] incoming-call received:', data)
 
-        socketRef.current.on('disconnect', () => {
-            setConnected(false)
-        })
+           // Ignore if this is your own outgoing call
+            if (data.callerId === userData?._id) return
 
-        // ✅ Incoming call listener (VERY IMPORTANT)
-        socketRef.current.on('incoming-call', (data) => {
-            console.log('Incoming call:', data)
+          // Join call room if not already joined
+            socket.emit('join-room', data.roomId)
 
-            const { roomId, callType, callerId } = data
-            if (callerId === userData?._id) return
-            setCallRoomId(roomId)
-            setCallType(callType)
-
-            setIsInitiator(false) // receiver always false
-
+           // Save incoming call data so VideoCall can use it
+            setInitialIncomingCall(data)
+            setCallRoomId(data.roomId)
+            setCallType(data.callType || 'audio')
+            setIsInitiator(false)
             setShowVideoCall(true)
         })
 
-
-        socketRef.current.on('call-rejected', () => {
-            alert('Call rejected')
+       // When doctor rejects the call
+        socket.on('call-rejected', () => {
+            setShowVideoCall(false)
             setCallRoomId(null)
+            setInitialIncomingCall(null)
+            setIsInitiator(false)
         })
 
-        // Cleanup
-        return () => {
-            socketRef.current.disconnect()
-        }
+        return () => { socket.disconnect() }
+    }, [chatRoomId, myCallRoomId, userData?._id, backendUrl])
 
-
-    }, [roomId, userData])
-
-
+   // Load previous chat messages
     useEffect(() => {
         const loadHistory = async () => {
             try {
-                const { data } = await axios.get(
-                    backendUrl + `/api/chat/history/${roomId}`
-                );
-                if (data.success) setMessages(data.messages);
+                const { data } = await axios.get(backendUrl + `/api/chat/history/${chatRoomId}`)
+                if (data.success) setMessages(data.messages)
+                await axios.put(backendUrl + `/api/chat/mark-read/${chatRoomId}`, { readBy: userData?._id })
+            } catch (err) { console.log(err) }
+        }
+        loadHistory()
+    }, [chatRoomId])
 
-                await axios.put(
-                    backendUrl + `/api/chat/mark-read/${roomId}`,
-                    { readBy: userData?._id }
-                )
-            } catch (err) {
-                console.log(err);
-            }
-        };
-        loadHistory();
-    }, [roomId]);
-
+    // Scroll to latest message
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
+    //  Send message
     const sendMessage = async () => {
         if (!input.trim() && !selectedImage) return
 
-        // ✅ Image send karo
         if (selectedImage) {
             const formData = new FormData()
             formData.append('image', selectedImage)
-            formData.append('roomId', roomId)
+            formData.append('roomId', chatRoomId)
             formData.append('sender', userData?._id)
             formData.append('senderType', 'user')
             formData.append('name', userData?.name)
-
             try {
-                const { data } = await axios.post(
-                    backendUrl + '/api/chat/upload-image',
-                    formData,
-                    { headers: { 'Content-Type': 'multipart/form-data' } }
-                )
+                const { data } = await axios.post(backendUrl + '/api/chat/upload-image', formData,
+                    { headers: { 'Content-Type': 'multipart/form-data' } })
                 if (data.success) {
                     socketRef.current.emit('send-message', {
-                        roomId,
-                        message: '',
-                        imageUrl: data.message.imageUrl,
-                        sender: userData?._id,
-                        senderType: 'user',
-                        name: userData?.name
+                        roomId: chatRoomId, message: '', imageUrl: data.message.imageUrl,
+                        sender: userData?._id, senderType: 'user', name: userData?.name
                     })
                 }
-            } catch (err) {
-                console.log(err)
-            }
-
+            } catch (err) { console.log(err) }
             setSelectedImage(null)
             setInput('')
             return
         }
 
-        // ✅ Normal text message
         socketRef.current.emit('send-message', {
-            roomId,
-            message: input.trim(),
-            sender: userData?._id,
-            senderType: 'user',
-            name: userData?.name
+            roomId: chatRoomId, message: input.trim(),
+            sender: userData?._id, senderType: 'user', name: userData?.name
         })
         setInput('')
     }
 
+    // Handle image selection
     const handleImageSelect = (e) => {
         const file = e.target.files[0]
         if (!file) return
-        setSelectedImage(file)      // file store karo
-        setInput(file.name)         // input mein naam dikhao
-        e.target.value = ''         // file input reset karo
+        setSelectedImage(file)
+        setInput(file.name)
+        e.target.value = ''
     }
 
+
+    // Handle typing event
     const handleTyping = (e) => {
-        if (selectedImage) {
-            setSelectedImage(null)  // image deselect ho jaye agar user type kare
-        }
+        if (selectedImage) setSelectedImage(null)
         setInput(e.target.value)
-
-        socketRef.current.emit('typing', { roomId, name: userData?.name })
-
+        socketRef.current.emit('typing', { roomId: chatRoomId, name: userData?.name })
         clearTimeout(typingTimeoutRef.current)
         typingTimeoutRef.current = setTimeout(() => {
-            socketRef.current.emit('stop-typing', { roomId })
+            socketRef.current.emit('stop-typing', { roomId: chatRoomId })
         }, 2000)
     }
 
+    
     const handleKeyPress = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -205,28 +177,23 @@ const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose 
         }
     }
 
-
-    const startCall = async (type) => {
-        const newCallRoomId = `call_${doctorId}_${userData?._id}`
-        setCallRoomId(newCallRoomId)
-        setIsInitiator(true)
+    // User start a call to doctor
+    const startCall = (type) => {
+        setCallRoomId(myCallRoomId)
         setCallType(type)
-
-        console.log('Patient callRoomId:', `call_${doctorId}_${userData?._id}`)
-        console.log('doctorId:', doctorId)
-        console.log('patientId:', userData?._id)
-        socketRef.current.emit('join-room', newCallRoomId)
-        socketRef.current.emit('call-user', {
-            roomId: newCallRoomId,
-            callerId: userData?._id,
-            callerModel: 'user',
-            receiverId: doctorId,
-            receiverModel: 'doctor',
-            callType: type,
-            callerName: userData?.name,
-            callerImage: userData?.image
-        })
+        setIsInitiator(true)
+        setInitialIncomingCall(null)
         setShowVideoCall(true)
+        console.log('[ChatWindow] Starting outgoing call:', myCallRoomId)
+    }
+
+    // Close call screen and reset state
+    const handleCallClose = () => {
+        setShowVideoCall(false)
+        setCallRoomId(null)
+        setCallType('audio')
+        setIsInitiator(false)
+        setInitialIncomingCall(null)
     }
 
     return (
@@ -234,89 +201,98 @@ const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose 
 
             {/* Header */}
             <div className='bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 flex items-center gap-3'>
-                <img
-                    src={doctorImage}
-                    alt={doctorName}
-                    className='w-9 h-9 rounded-full object-cover border-2 border-white'
-                />
+                <img src={doctorImage} alt={doctorName}
+                    className='w-9 h-9 rounded-full object-cover border-2 border-white' />
                 <div className='flex-1'>
                     <p className='text-white font-semibold text-sm'>{doctorName}</p>
-                    <p className='text-blue-100 text-xs'>
-                        {isTyping ? '✍️ Typing...' : connected ? '🟢 Online' : '🔴 Offline'}
+                    <p className='text-blue-100 text-xs flex items-center gap-1'>
+                        <img
+                            src={
+                                isTyping
+                                    ? assets.chattingIcon
+                                    : connected
+                                        ? assets.onlineIcon
+                                        : assets.offlineIcon
+                            }
+                            alt="status"
+                            className="w-5 h-5"
+                        />
+
+                        <span>
+                            {isTyping
+                                ? 'Doctor is typing...'
+                                : connected
+                                    ? 'Online'
+                                    : 'Offline'}
+                        </span>
                     </p>
                 </div>
-
                 <div className='flex items-center gap-2'>
                     <button
                         onClick={() => startCall('audio')}
                         title='Audio Call'
                         className='w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition'
                     >
-                        📞
+                        <img src={assets.audioIcon} alt="audio call" className="w-4 h-4" />
                     </button>
                     <button
                         onClick={() => startCall('video')}
                         title='Video Call'
                         className='w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition'
                     >
-                        📹
+                        <img src={assets.videoIcon} alt="video call" className="w-4 h-4" />
                     </button>
-
                     {onClose && (
-                        <button
-                            onClick={onClose}
-                            className='text-white hover:text-blue-200 text-lg'
-                        >
-                            ✕
+                        <button onClick={onClose} className='text-white hover:text-blue-200 text-lg ml-1 w-8 h-8 flex items-center justify-center'>
+                            <img className="w-5 h-5 transition transform hover:scale-110" src={assets.crossIcon} alt="" />
                         </button>
                     )}
                 </div>
-
             </div>
 
             {/* Messages */}
             <div className='flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50'>
                 {messages.length === 0 && (
-                    <p className='text-center text-gray-400 text-sm mt-10'>
-                        👋 Chat shuru karo
-                    </p>
+                    <div className="text-center text-gray-400 mt-10 flex flex-col items-center gap-2">
+                        <img
+                            src={assets.waitingIcon}
+                            alt="waiting"
+                            className="w-6 h-6 opacity-70"
+                        />
+                        <p className="text-sm"> Start a conversation with your doctor</p>
+                    </div>
                 )}
 
                 {messages.map((msg, index) => (
-                    <div
-                        key={index}
-                        className={`flex ${msg.sender === userData?._id ? 'justify-end' : 'justify-start'}`}
-                    >
-                        <div className={`max-w-[70%] px-3 py-2 rounded-2xl text-sm ${msg.sender === userData?._id
-                            ? 'bg-indigo-600 text-white rounded-br-none'
+                    <div key={index}
+                        className={`flex ${msg.sender === userData?._id ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[70%] px-3 py-2 rounded-2xl text-sm ${
+                            msg.sender === userData?._id
+                                ? 'bg-indigo-100 text-indigo-900 rounded-br-none'   
                             : 'bg-white text-gray-800 rounded-bl-none shadow'
-                            }`}>
-
+                        }`}>
                             {msg.imageUrl && (
-                                <img
-                                    src={msg.imageUrl}
-                                    alt='chat-img'
+                                <img src={msg.imageUrl} alt='chat-img'
                                     className='max-w-full rounded-lg mb-1 cursor-pointer'
-                                    onClick={() => window.open(msg.imageUrl, '_blank')}
-                                />
+                                    onClick={() => window.open(msg.imageUrl, '_blank')} />
                             )}
-                            <p>{msg.message}</p>
+                            {msg.message && <p>{msg.message}</p>}
                             <p className='text-xs mt-1 opacity-60'>
-                                {new Date(msg.time).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                })}
+                                {new Date(msg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 {msg.sender === userData?._id && (
-                                    <span className='ml-1'>
-                                        {msg.isRead ? '✓✓' : '✓'}
+                                    <span className='ml-1 flex items-center'>
+                                        <img
+                                            src={msg.isRead ? assets.readIcon : assets.sendIcon}
+                                            alt=""
+                                            className="w-6 h-6"
+                                            style={{ filter: 'invert(48%) sepia(79%) saturate(476%) hue-rotate(86deg) brightness(118%) contrast(119%)' }}
+                                        />
                                     </span>
                                 )}
                             </p>
                         </div>
                     </div>
                 ))}
-
-                {/* Typing dots */}
                 {isTyping && (
                     <div className='flex justify-start'>
                         <div className='bg-white px-4 py-2 rounded-2xl shadow'>
@@ -332,40 +308,67 @@ const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose 
             </div>
 
             {/* Input */}
-            <div className='border-t p-3 flex gap-2 bg-white'>
+            <div className='border-t p-3 bg-white'>
 
-                <label className='cursor-pointer flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 transition'>
-                    📎
+                {/* Selected Image */}
+                {selectedImage && (
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-2 px-1">
+                        <span className="truncate max-w-[200px]">
+                            {selectedImage.name}
+                        </span>
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="text-red-500 hover:text-red-700 flex items-center justify-center"
+                        >
+                            <img
+                                src={assets.crossIcon}
+                                alt=""
+                                className="w-3 h-3 filter invert"
+                            />
+                        </button>
+                    </div>
+                )}
+
+                {/* Input Row */}
+                <div className='flex gap-2'>
+                    <label className='cursor-pointer flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 transition'>
+                        <img className='h-4 w-4' src={assets.attachIcon} alt="" />
+                        <input
+                            type='file'
+                            accept='image/*'
+                            onChange={handleImageSelect}
+                            className='hidden'
+                        />
+                    </label>
+
                     <input
-                        type='file'
-                        accept='image/*'
-                        onChange={handleImageSelect}
-                        className='hidden'
+                        type='text'
+                        value={input}
+                        onChange={handleTyping}
+                        onKeyDown={handleKeyPress}
+                        placeholder="Type your message..."
+                        className='flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-indigo-400'
                     />
-                </label>
 
-                <input
-                    type='text'
-                    value={input}
-                    onChange={handleTyping}
-                    onKeyDown={handleKeyPress}
-                    placeholder='Message likho...'
-                    className='flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-indigo-400'
-                />
-                <button
-                    onClick={sendMessage}
-                    disabled={!input.trim() && !selectedImage}
-                    className='bg-indigo-600 text-white w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-50 hover:bg-indigo-700 transition'
-                >
-                    ➤
-                </button>
+                    <button
+                        onClick={sendMessage}
+                        disabled={!input.trim() && !selectedImage}
+                        className='bg-indigo-600 text-white w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-50 hover:bg-indigo-700 transition'
+                    >
+                        <img src={assets.sendMsgIcon} alt="" className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
+
+            {/* VideoCall overlay */}
             {showVideoCall && callRoomId && (
                 <div className='fixed inset-0 bg-black/90 z-50'>
                     <VideoCall
+                        socketRef={socketRef}
                         roomId={callRoomId}
                         callType={callType}
                         isInitiator={isInitiator}
+                        initialIncomingCall={initialIncomingCall}
                         callerId={userData?._id}
                         callerModel='user'
                         receiverId={doctorId}
@@ -374,18 +377,10 @@ const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose 
                         callerImage={userData?.image}
                         receiverName={doctorName}
                         receiverImage={doctorImage}
-                        onClose={() => {
-                            if (socketRef.current && callRoomId) {
-                                socketRef.current.emit('leave-room', callRoomId)
-                            }
-                            setShowVideoCall(false)
-                            setCallType(null)
-                            setCallRoomId(null)
-                        }}
+                        onClose={handleCallClose}
                     />
                 </div>
             )}
-
         </div>
     )
 }

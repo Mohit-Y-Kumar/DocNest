@@ -7,11 +7,20 @@
   --color-brand-dark: #1A1F5E;
   --color-brand-pink: #FF6B8A;
 }
-
-::-webkit-scrollbar{
-    @apply hidden;
+::-webkit-scrollbar {
+  width: 5px;
 }
 
-*{
-    font-family: Outfit;
+::-webkit-scrollbar-thumb {
+  background: #083ef0;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(229, 100%, 69%);
+}
+
+
+body {
+  font-family: 'Outfit', sans-serif;
 }

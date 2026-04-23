@@ -7,11 +7,10 @@ import SymptomChecker from '../components/SymptomChecker'
 
 const Home = () => {
   return (
-    <div className=''>
-      <Header/>
-      <SymptomChecker/>
+    <div className='px-4 sm:px-8 md:px-16 max-w-7xl mx-auto'>
+      <Header />
+      <SymptomChecker />
       <SpecialityMenu />
-
       <TopDoctors />
       <Banner />
     </div>

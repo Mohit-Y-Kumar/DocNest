@@ -3,6 +3,7 @@ import { DoctorContext } from '../../context/DoctorContext'
 import { AppContext } from '../../context/AppContext'
 import { assets } from '../../assets/assets'
 import DoctorChat from './DoctorChat'
+import chaticon from '../../assets/chats_icon.svg'
 
 const DoctorAppointments = () => {
 
@@ -39,9 +40,9 @@ const DoctorAppointments = () => {
     { key: 'cancelled', label: 'Cancelled', color: 'bg-red-500 text-white', inactive: 'text-red-500 bg-red-50' },
   ]
   return (
-    <div className='ml-24 md:ml-64 m-5 space-y-5'>
+    <div className='m-3 sm:m-5 space-y-4 sm:space-y-5'>
 
-      {/* ── Page Title ── */}
+      {/*  Page Title */}
       <div className='  flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
         <div>
           <h1 className='text-xl font-bold text-[#1A1F5E]'>All Appointments</h1>
@@ -49,7 +50,7 @@ const DoctorAppointments = () => {
         </div>
 
         {/* Filter Tabs */}
-        <div className='flex flex-wrap gap-2'>
+        <div className='flex flex-wrap gap-2 overflow-x-auto pb-1'>
           {filterTabs.map(tab => (
             <button
               key={tab.key}
@@ -65,11 +66,9 @@ const DoctorAppointments = () => {
         </div>
       </div>
 
-      {/* ── Table Card ── */}
       <div className='bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden'>
 
-        {/* Desktop Header */}
-        <div className='hidden lg:grid grid-cols-[0.4fr_2fr_1fr_0.7fr_2.2fr_1fr_1fr_0.8fr] gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider'>
+        <div className='hidden xl:grid grid-cols-[0.4fr_2fr_1fr_0.7fr_2.2fr_1fr_1fr_0.8fr] gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider'>
           <span>#</span>
           <span>Patient</span>
           <span>Payment</span>
@@ -93,10 +92,10 @@ const DoctorAppointments = () => {
 
         {/* Rows */}
         <div className='divide-y divide-gray-50 max-h-[65vh] overflow-y-auto'>
-          {filtered.map((item, index) => (
+          {filtered.slice().reverse().map((item, index) => (
             <div
               key={index}
-              className='flex flex-col gap-3 lg:grid lg:grid-cols-[0.4fr_2fr_1fr_0.7fr_2.2fr_1fr_1fr_0.8fr] lg:gap-2 items-start lg:items-center px-5 py-4 hover:bg-[#f9f9ff] transition-colors'
+              className='flex flex-col gap-3 xl:grid xl:grid-cols-[0.4fr_2fr_1fr_0.7fr_2.2fr_1fr_1fr_0.8fr] xl:gap-2 items-start xl:items-center px-4 sm:px-5 py-4 hover:bg-[#f9f9ff] transition-colors'
             >
               {/* Index */}
               <p className='hidden lg:block text-sm text-gray-400 font-medium'>{index + 1}</p>
@@ -108,24 +107,26 @@ const DoctorAppointments = () => {
                   src={item.userData.image}
                   alt=''
                 />
-                <div>
-                  <p className='text-sm font-semibold text-gray-800'>{item.userData.name}</p>
-                  <p className='text-xs text-gray-400 lg:hidden'>{slotDateFormat(item.slotDate)}, {item.slotTime}</p>
+                <div className='flex-1 min-w-0'>
+                  <p className='text-sm font-semibold text-gray-800 truncate'>{item.userData.name}</p>
+                  <p className='text-xs text-gray-400 xl:hidden'>{slotDateFormat(item.slotDate)}, {item.slotTime}</p>
                 </div>
               </div>
 
               {/* Payment */}
-              <div>
+              <div className='flex flex-wrap items-center gap-2 xl:contents'>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${item.payment ? 'bg-[#eef0ff] text-[#5F6FFF]' : 'bg-gray-100 text-gray-500'}`}>
                   {item.payment ? 'Online' : 'Cash'}
                 </span>
               </div>
 
               {/* Age */}
-              <p className='hidden lg:block text-sm text-gray-500'>{calculateAge(item.userData.dob)} yrs</p>
+              <span className='text-xs text-gray-500 px-2.5 py-1 rounded-full bg-gray-50'>
+                {calculateAge(item.userData.dob)} yrs
+              </span>
 
               {/* Date */}
-              <p className='hidden lg:block text-sm text-gray-500'>
+              <p className='hidden xl:block text-sm text-gray-500'>
                 {slotDateFormat(item.slotDate)}, <span className='font-medium text-gray-700'>{item.slotTime}</span>
               </p>
 
@@ -171,17 +172,17 @@ const DoctorAppointments = () => {
                 }}
                 className='flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-[#eef0ff] text-[#5F6FFF] hover:bg-[#5F6FFF] hover:text-white transition-all'
               >
-                💬 Chat
+                <img src={chaticon} alt="chat" className="w-4 h-4 text-blue-400S" /> Chat
               </button>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Chat Modal ── */}
+      {/* Chat Modal */}
       {showChat && selectedPatient && (
-        <div className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4'>
-          <div className='w-full max-w-md'>
+        <div className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4'>
+          <div className='w-full sm:w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden'>
             <DoctorChat
               docId={selectedPatient.docId}
               patientId={selectedPatient.userId}

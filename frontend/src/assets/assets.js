@@ -23,6 +23,47 @@ import info_icon from './info_icon.svg'
 import upload_icon from './upload_icon.png'
 import stripe_logo from './stripe_logo.png'
 import razorpay_logo from './razorpay_logo.png'
+
+import chattingIcon from './chating.svg'
+import onlineIcon from './online.svg'
+import offlineIcon from './offline.svg'
+import audioIcon from './audioicon.svg'
+import videoIcon from './videoicon.svg'
+import crossIcon from './cross.svg'
+import waitingIcon from './waiting.svg'
+import readIcon from './read.svg'
+import sendIcon from './send.svg'
+import attachIcon from './attach.svg'
+import sendMsgIcon from './sendicon.svg'
+
+
+import feverIcon from './fever.svg'
+import headacheIcon from './headache.svg'
+import stomachIcon from './stomach.svg'
+import skinIcon from './skin.svg'
+import childIcon from './child.svg'
+import eyeiconIcon from './eyeicon.svg'
+import appointiconIcon from './appointicon.svg'
+import docIcon from './docsearch.svg'
+import clockIcon from './clock.svg'
+import earningIcon from './earning_icon.svg'
+import chatIcon from './chat.svg'
+import robotIcon from './robot.svg'
+import loadingIcon from './loading.svg'
+import speakerIcon from './speaker.svg'
+import micIcon from './mic.svg'
+import stopIcon from './stop.svg'
+
+
+import videoCallIcon from './videocall.svg'
+import audioCallIcon from './audiocall.svg'
+import incomingIcon from './incomingicon.svg'
+import bellIcon from './bell.svg'
+import callEndIcon from './callend.svg'
+import muteMicIcon from './mic-mute.svg'
+import muteVideoIcon from './muteVideoicon.svg'
+
+
 import doc1 from './doc1.png'
 import doc2 from './doc2.png'
 import doc3 from './doc3.png'
@@ -45,8 +86,69 @@ import Gynecologist from './female.svg'
 import Neurologist from './Neurologist.svg'
 import Pediatricians from './Pediatricians.svg'
 
+import editIcon from './edit.svg'
+import trashIcon from './trash.svg'
+import lenseIcon from './searchlense.svg'
+import userIcon from './usericon.svg'
 
 export const assets = {
+     userIcon,
+    videoCallIcon,
+    audioCallIcon,
+    incomingIcon,
+    bellIcon,
+    callEndIcon,
+    muteMicIcon,
+    videoIcon,
+    muteVideoIcon,
+
+    lenseIcon,
+    editIcon,
+    trashIcon,
+    stopIcon,
+    micIcon,
+    speakerIcon,
+    feverIcon,
+    headacheIcon,
+    stomachIcon,
+    skinIcon,
+    childIcon,
+    eyeiconIcon,
+    appointiconIcon,
+    docIcon,
+    clockIcon,
+    earningIcon,
+    chatIcon,
+    robotIcon,
+    loadingIcon,
+
+    feverIcon,
+    headacheIcon,
+    stomachIcon,
+    skinIcon,
+    childIcon,
+    eyeiconIcon,
+    appointiconIcon,
+    docIcon,
+    clockIcon,
+    earningIcon,
+    chatIcon,
+    crossIcon,
+    robotIcon,
+    loadingIcon,
+    sendIcon,
+
+    chattingIcon,
+    onlineIcon,
+    offlineIcon,
+    audioIcon,
+    videoIcon,
+    crossIcon,
+    waitingIcon,
+    readIcon,
+    sendIcon,
+    attachIcon,
+    sendMsgIcon,
     appointment_img,
     header_img,
     group_profiles,
@@ -70,7 +172,9 @@ export const assets = {
     ratingstar,
     filledStar,
     blackStar,
-    filledheart
+    filledheart,
+
+
 }
 
 export const specialityData = [

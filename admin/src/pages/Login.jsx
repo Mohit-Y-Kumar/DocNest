@@ -47,9 +47,9 @@ const Login = () => {
     }
 
     return (
-        <form onSubmit={onSubmitHandler} className='min-h-[80vh] flex items-center'>
+        <form onSubmit={onSubmitHandler} className='min-h-[80vh] flex items-center px-4'>
             <div className='flex flex-col gap-3 m-auto items-start p-8 min-w-[340px] sm:min-w-96 border rounded-xl text-sm shadow-lg'>
-                <p className='text-2xl font-semibold m-auto'>
+                <p className='text-xl sm:text-2xl font-semibold m-auto'>
                     <span className='text-primary'> {state} </span> Login
                 </p>
                 <div className='w-full'>

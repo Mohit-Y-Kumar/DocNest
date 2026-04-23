@@ -3,6 +3,8 @@ import { io } from 'socket.io-client'
 import { DoctorContext } from '../../context/DoctorContext'
 import axios from 'axios'
 import DoctorVideoCall from './DoctorVideoCall'
+import { assets } from '../../assets/assets'
+
 
 const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) => {
     const { backendUrl, profileData } = useContext(DoctorContext)
@@ -13,32 +15,29 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
     const [connected, setConnected] = useState(false)
     const [showVideoCall, setShowVideoCall] = useState(false)
     const [incomingCallData, setIncomingCallData] = useState(null)
+    const [isCalling, setIsCalling] = useState(false)
+    const [callType, setCallType] = useState('audio')
+    const [selectedImage, setSelectedImage] = useState(null)
+
     const socketRef = useRef(null)
     const messagesEndRef = useRef(null)
     const typingTimeoutRef = useRef(null)
-    const [callType, setCallType] = useState('audio')
-    const [selectedImage, setSelectedImage] = useState(null)
-    const [isCalling, setIsCalling] = useState(false)
-    // Same room ID — jo patient ne use kiya
+
     const roomId = `chat_${docId}_${patientId}`
-    console.log('Doctor callRoomId:', `call_${docId}_${patientId}`)
-    console.log('docId:', docId)
-    console.log('patientId:', patientId)
+    const callRoomId = `call_${docId}_${patientId}`
 
     useEffect(() => {
-        // ✅ Connect karo
         socketRef.current = io(backendUrl, {
             transports: ['websocket', 'polling'],
-            extraHeaders: {
-                'ngrok-skip-browser-warning': 'true'
-            }
+            extraHeaders: { 'ngrok-skip-browser-warning': 'true' }
         })
+
         socketRef.current.on('connect', () => {
             setConnected(true)
-            console.log('✅ Doctor Socket connected')
-
-            // Same room join karo
+            //  join  Chat room 
             socketRef.current.emit('join-room', roomId)
+            //  join Call room 
+            socketRef.current.emit('join-room', callRoomId)
 
             socketRef.current.emit('message-read', {
                 roomId,
@@ -46,10 +45,10 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
             })
         })
 
-        // Message receive karo
         socketRef.current.on('receive-message', (data) => {
             setMessages(prev => [...prev, data])
         })
+
         socketRef.current.on('message-seen', (data) => {
             setMessages(prev => prev.map(msg =>
                 msg.sender === docId
@@ -58,35 +57,36 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
             ))
         })
 
-        // Typing
-        socketRef.current.on('user-typing', () => {
-            setIsTyping(true)
-        })
+        socketRef.current.on('user-typing', () => setIsTyping(true))
+        socketRef.current.on('user-stop-typing', () => setIsTyping(false))
 
-        socketRef.current.on('user-stop-typing', () => {
-            setIsTyping(false)
-        })
+        //  Incoming call 
         socketRef.current.on('incoming-call', (data) => {
+            console.log('[DoctorChat] incoming-call:', data)
+            if (data.callerId === docId) return  
+
+            // join Call room 
             socketRef.current.emit('join-room', data.roomId)
+
             setIncomingCallData(data)
             setIsCalling(false)
             setShowVideoCall(true)
         })
-        socketRef.current.on('disconnect', () => {
-            setConnected(false)
-        })
+
+        socketRef.current.on('disconnect', () => setConnected(false))
 
         return () => {
             socketRef.current.disconnect()
         }
-    }, [roomId])
-
-
+    }, [roomId, callRoomId, docId])
 
     useEffect(() => {
         const loadHistory = async () => {
             try {
-                const { data } = await axios.get(`${backendUrl}/api/chat/history/${roomId}`)
+                const res = await fetch(`${backendUrl}/api/chat/history/${roomId}`, {
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                })
+                const data = await res.json()
                 if (data.success) setMessages(data.messages)
                 await axios.put(
                     backendUrl + `/api/chat/mark-read/${roomId}`,
@@ -99,7 +99,6 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
         loadHistory()
     }, [roomId])
 
-    // Auto scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
@@ -107,7 +106,6 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
     const sendMessage = async () => {
         if (!input.trim() && !selectedImage) return
 
-        // ✅ Image send
         if (selectedImage) {
             const formData = new FormData()
             formData.append('image', selectedImage)
@@ -141,7 +139,6 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
             return
         }
 
-        // ✅ Normal text
         socketRef.current.emit('send-message', {
             roomId,
             message: input.trim(),
@@ -153,7 +150,6 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
     }
 
     const handleTyping = (e) => {
-
         setInput(e.target.value)
         socketRef.current.emit('typing', { roomId, name: 'Doctor' })
         clearTimeout(typingTimeoutRef.current)
@@ -177,67 +173,79 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
         e.target.value = ''
     }
 
+    //  Doctor call to  patient 
+    const startCall = (type) => {
+        // if  Room already joined then set  state 
+        setCallType(type)
+        setIsCalling(true)
+        setIncomingCallData(null)
+        setShowVideoCall(true)
+
+        console.log('[DoctorChat] Starting call:', callRoomId)
+    }
+
     return (
         <div className='flex flex-col h-[500px] border rounded-2xl overflow-hidden shadow-xl bg-white'>
 
             {/* Header */}
-
-
-
             <div className='bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 flex items-center gap-3'>
                 {patientImage && (
-                    <img
-                        src={patientImage}
-                        alt={patientName}
-                        className='w-9 h-9 rounded-full object-cover border-2 border-white'
-                    />
+                    <img src={patientImage} alt={patientName}
+                        className='w-9 h-9 rounded-full object-cover border-2 border-white' />
                 )}
                 <div className='flex-1'>
                     <p className='text-white font-semibold text-sm'>
                         {patientName || 'Patient'}
                     </p>
-                    <p className='text-blue-100 text-xs'>
-                        {isTyping ? '✍️ Typing...' : connected ? '🟢 Online' : '🔴 Offline'}
+                    <p className='text-blue-100 text-xs flex items-center gap-1'>
+                        <img
+                            src={
+                                isTyping
+                                    ? assets.chattingIcon
+                                    : connected
+                                        ? assets.onlineIcon
+                                        : assets.offlineIcon
+                            }
+                            alt="status"
+                            className="w-5 h-5"
+                        />
+
+                        {isTyping
+                            ? 'Typing...'
+                            : connected
+                                ? 'Online'
+                                : 'Offline'}
                     </p>
                 </div>
 
-                <button
-                    onClick={() => {
-                        setCallType('audio')  // ✅ audio
-                        setIsCalling(true)
-                        setShowVideoCall(true)
-                    }}
-                    className='w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition'
-                    title="Audio Call"
-                >
-                    📞
-                </button>
-                <button
-                    onClick={() => {
-                        setCallType('video')  // ✅ video
-                        setIsCalling(true)
-                        setShowVideoCall(true)
-                    }}
-                    className='w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition'
-                    title="Video Call"
-                >
-                    📹
-                </button>
-                {onClose && (
+                <div className='flex items-center gap-1 sm:gap-2 flex-shrink-0'>
                     <button
-                        onClick={onClose}
-                        className='text-white hover:text-blue-200 text-lg'
+                        onClick={() => { setCallType('audio'); setIsCalling(true); setShowVideoCall(true) }}
+                        className='w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition text-sm sm:text-base'
+                        title="Audio Call"
                     >
-                        ✕
+                        <img src={assets.audioIcon} alt="" />
                     </button>
-                )}
+                    <button
+                        onClick={() => { setCallType('video'); setIsCalling(true); setShowVideoCall(true) }}
+                        className='w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition text-sm sm:text-base'
+                        title="Video Call"
+                    >
+                        <img src={assets.videoIcon} alt="" />
+                    </button>
+                    {onClose && (
+                        <button onClick={onClose} className='text-white hover:text-blue-200 text-lg ml-1 w-8 h-8 flex items-center justify-center'>
+                            <img className="w-5 h-5 transition transform hover:scale-110" src={assets.crossIcon} alt="" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Messages */}
             <div className='flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50'>
                 {messages.length === 0 && (
                     <p className='text-center text-gray-400 text-sm mt-10'>
-                        👋 Patient ka message aane ka wait karo
+                        <img src={assets.waitingIcon} alt="" /> No messages yet
                     </p>
                 )}
 
@@ -246,9 +254,9 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
                         key={index}
                         className={`flex ${msg.senderType === 'doctor' ? 'justify-end' : 'justify-start'}`}
                     >
-                        <div className={`max-w-[70%] px-3 py-2 rounded-2xl text-sm ${msg.senderType === 'doctor'
-                            ? 'bg-indigo-600 text-white rounded-br-none'
-                            : 'bg-white text-gray-800 rounded-bl-none shadow'
+                        <div className={`max-w-[80%] sm:max-w-[70%] px-3 py-2 rounded-2xl text-sm ${msg.senderType === 'doctor'
+                                ? 'bg-indigo-100 text-indigo-900 rounded-br-none'
+                                : 'bg-white text-gray-800 rounded-bl-none shadow'
                             }`}>
                             {msg.imageUrl && (
                                 <img
@@ -260,16 +268,15 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
                             )}
                             <p>{msg.message}</p>
                             <p className='text-xs mt-1 opacity-60'>
-                                {new Date(msg.time).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                })}
+                                {new Date(msg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 {msg.sender === docId && (
-                                    <span className='ml-1'>
-                                        {msg.isRead
-                                            ? <span className='text-blue-300'>✓✓</span>
-                                            : <span className='opacity-60'>✓</span>
-                                        }
+                                    <span className='ml-1 flex items-center'>
+                                        <img
+                                            src={msg.isRead ? assets.readIcon : assets.sendIcon}
+                                            alt=""
+                                            className="w-6 h-6"
+                                            style={{ filter: 'invert(48%) sepia(79%) saturate(476%) hue-rotate(86deg) brightness(118%) contrast(119%)' }}
+                                        />
                                     </span>
                                 )}
                             </p>
@@ -277,7 +284,6 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
                     </div>
                 ))}
 
-                {/* Typing dots */}
                 {isTyping && (
                     <div className='flex justify-start'>
                         <div className='bg-white px-4 py-2 rounded-2xl shadow'>
@@ -293,10 +299,10 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
             </div>
 
             {/* Input */}
-            <div className='border-t p-3 flex gap-2 bg-white'>
+            <div className='border-t p-2 sm:p-3 flex gap-2 bg-white flex-shrink-0 pb-[env(safe-area-inset-bottom,8px)]'>
 
                 <label className='cursor-pointer flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 transition'>
-                    📎
+                    <img className='h-4 w-4' src={assets.attachIcon} alt="" />
                     <input
                         type='file'
                         accept='image/*'
@@ -309,7 +315,7 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
                     value={input}
                     onChange={handleTyping}
                     onKeyDown={handleKeyPress}
-                    placeholder='Patient ko reply karo...'
+                    placeholder="Enter your response for the patient..."
                     className='flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-indigo-400'
                 />
                 <button
@@ -317,35 +323,27 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
                     disabled={!input.trim() && !selectedImage}
                     className='bg-indigo-600 text-white w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-50 hover:bg-indigo-700 transition'
                 >
-                    ➤
+                    <img src={assets.sendMsgIcon} alt="" />
                 </button>
             </div>
+
+            {/*  VideoCall */}
             {showVideoCall && (
                 <div className='fixed inset-0 bg-black/90 z-50'>
                     <DoctorVideoCall
                         socketRef={socketRef}
-                        roomId={`call_${docId}_${patientId}`}
-
+                        roomId={callRoomId}
                         callType={incomingCallData?.callType || callType}
-
-                        // ✅ dynamic role
                         isInitiator={isCalling}
-
-                        // ✅ caller / receiver logic
                         callerId={isCalling ? docId : incomingCallData?.callerId}
                         callerModel={isCalling ? 'doctor' : incomingCallData?.callerModel}
-
                         receiverId={isCalling ? patientId : docId}
                         receiverModel={isCalling ? 'user' : 'doctor'}
-
-                        callerName={isCalling ? 'Doctor' : incomingCallData?.callerName}
+                        callerName={isCalling ? (profileData?.name || 'Doctor') : incomingCallData?.callerName}
                         callerImage={isCalling ? profileData?.image : incomingCallData?.callerImage}
-
-                        receiverName={isCalling ? patientName : 'Doctor'}
+                        receiverName={isCalling ? patientName : (profileData?.name || 'Doctor')}
                         receiverImage={isCalling ? patientImage : profileData?.image}
-
                         incomingCall={incomingCallData}
-
                         onClose={() => {
                             setShowVideoCall(false)
                             setIncomingCallData(null)
@@ -354,7 +352,6 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
                     />
                 </div>
             )}
-
         </div>
     )
 }

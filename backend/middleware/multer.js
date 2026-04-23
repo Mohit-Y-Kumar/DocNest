@@ -1,11 +1,29 @@
-import multer from 'multer';
+import multer from 'multer'
+import path from 'path'
+import { randomUUID } from 'crypto'
+
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
 const storage = multer.diskStorage({
-    filename: function(req,file,callback) {
-        callback(null,file.originalname)
+    filename: (_req, file, callback) => {
+        const ext = path.extname(file.originalname).toLowerCase()
+        callback(null, `${randomUUID()}${ext}`)
     }
-  })
+})
 
-  const upload =multer({storage})
+const fileFilter = (_req, file, callback) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        callback(null, true)
+    } else {
+        callback(new Error('Only JPEG, PNG, WEBP and GIF images are allowed'), false)
+    }
+}
 
-  export default upload
+const upload = multer({
+    storage,
+    fileFilter,
+    limits: { fileSize: MAX_FILE_SIZE }
+})
+
+export default upload

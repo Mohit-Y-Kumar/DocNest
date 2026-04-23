@@ -3,219 +3,226 @@ import { AppContext } from '../context/AppContext'
 import { toast } from 'react-toastify'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+const slotDateFormat = (slotDate) => {
+  const [d, m, y] = slotDate.split('_')
+  return `${d} ${MONTHS[Number(m) - 1]} ${y}`
+}
+
 const MyAppointments = () => {
   const { backendUrl, token, getDoctorsData } = useContext(AppContext)
+  const navigate = useNavigate()
 
   const [appointments, setAppointments] = useState([])
-
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-  const navigate = useNavigate()
-  const slotDateFormat = (slotDate) => {
-    const dateArray = slotDate.split('_')
-    return dateArray[0] + " " + months[Number(dateArray[1] - 1)] + " " + dateArray[2]
-
-  }
+  const [loadingId, setLoadingId] = useState(null)
 
   const getUserAppointments = async () => {
     try {
-
-      const { data } = await axios.get(backendUrl + '/api/user/appointments', { headers: { 'Authorization': `Bearer ${token}` } })
+      const { data } = await axios.get(
+        backendUrl + '/api/user/appointments',
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
       if (data.success) {
-        setAppointments(data.appointments.reverse())
-        console.log(data.appointments);
+       setAppointments(data.appointments)
       } else {
         toast.error(data.message)
       }
-
-    } catch (error) {
-      console.log(error);
-      toast.error(error.message)
-
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message)
     }
   }
 
-
-  const cancelAppointment = async (appointmentId) => {
+  const cancelAppointment = async (id) => {
+    setLoadingId(id)
     try {
+      const t = token || localStorage.getItem('token')
       const { data } = await axios.post(
-        backendUrl + "/api/user/cancel-appointment",
-        { appointmentId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+        backendUrl + '/api/user/cancel-appointment',
+        { appointmentId: id },
+        { headers: { Authorization: `Bearer ${t}` } }
+      )
       if (data.success) {
-        toast.success("Appointment cancelled successfully");
-
-        // refresh list
-        getUserAppointments();
-        getDoctorsData();
+        toast.success('Appointment cancelled successfully')
+        getUserAppointments()
+        getDoctorsData()
       } else {
-        toast.error(data.message);
+        toast.error(data.message)
       }
-
-    } catch (error) {
-      console.log(error);
-      toast.error(error.message);
-
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message)
+    } finally {
+      setLoadingId(null)
     }
   }
 
-  
-  const initPay = (order) => {
+  const initPay = (order, appointmentId) => {
+    if (!window.Razorpay) {
+      toast.error('Payment system not loaded. Please refresh.')
+      return
+    }
     const options = {
       key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-      amount: order.amount, // must be in paise
+      amount: order.amount,
       currency: order.currency,
-      name: "Appointment Payment",
-      description: "Appointment Payment",
+      name: 'Appointment Payment',
+      description: 'Doctor Appointment',
       order_id: order.id,
-
       handler: async (response) => {
-        console.log(response)
-
         try {
+          const t = token || localStorage.getItem('token')
           const { data } = await axios.post(
-            backendUrl + "/api/user/verifyRazorpay",
+            backendUrl + '/api/user/verifyRazorpay',
             { response },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+            { headers: { Authorization: `Bearer ${t}` } }
+          )
           if (data.success) {
-            getUserAppointments();
-            navigate('/my-appointments')
+            toast.success('Payment successful!')
+            getUserAppointments()
           } else {
-            toast.error("Payment verification failed");
+            toast.error('Payment verification failed')
           }
-        }
-        catch (error) {
-          console.error("Verification error:", error);
-          toast.error(
-            error?.response?.data?.message || "Payment verification error"
-          );
+        } catch (err) {
+          toast.error(err.response?.data?.message || 'Payment verification error')
         }
       },
-
-      theme: {
-        color: "#3399cc",
+      modal: {
+        ondismiss: () => toast.info('Payment cancelled')
       },
-    };
+      theme: { color: '#6366f1' }
+    }
+    new window.Razorpay(options).open()
+  }
 
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-  };
-
-
-
-  const appointmentRazorpay = async (appointmentId) => {
+  const appointmentRazorpay = async (id) => {
+    setLoadingId(id)
     try {
+      const t = token || localStorage.getItem('token')
       const { data } = await axios.post(
-        backendUrl + "/api/user/payment-razorpay",
-        { appointmentId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-
+        backendUrl + '/api/user/payment-razorpay',
+        { appointmentId: id },
+        { headers: { Authorization: `Bearer ${t}` } }
+      )
       if (data.success) {
-        initPay(data.order)
+        initPay(data.order, id)
       } else {
         toast.error(data.message)
       }
-
-
-    } catch (error) {
-
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message)
+    } finally {
+      setLoadingId(null)
     }
-
-
   }
 
   useEffect(() => {
-    if (token) {
-      getUserAppointments()
-    }
-  }, [token])
+    const t = token || localStorage.getItem('token')
+    if (t) getUserAppointments()
+  }, [])
 
-
+  if (!appointments.length) return (
+    <div className='px-4 sm:px-8 md:px-16 max-w-4xl mx-auto'>
+      <p className='pb-3 mt-10 sm:mt-12 font-medium text-zinc-700 border-b text-base sm:text-lg'>
+        My Appointments
+      </p>
+      <p className='text-gray-400 text-sm mt-8 text-center'>No appointments found.</p>
+    </div>
+  )
 
   return (
-    <div>
-      <p className='pb-3 mt-12 font-medium text-zinc-700 border-b'>My appointments</p>
-      <div>
-        {appointments.map((item, index) => (
-          <div className='grid grid-cols-[lfr_2fr] gap-4 sm:flex sm:gap-6 py-2 border-b' key={index}>
-            <div>
-              <img className='w-32  bg-indigo-50' src={item.docData.image} alt="" />
-            </div>
-            <div className=' flex-1 text-sm text-zinc-600'>
-              <p className='  text-neutral-800 font-semibold'>{item.docData.name}</p>
-              <p>{item.docData.speciality}</p>
-              <p className=' text-zinc-700 font-medium mt-1'>Address:</p>
-              <p className='text-xs'>{item.docData.address.line1}</p>
-              <p className='text-xs'>{item.docData.address.line2}</p>
-              <p className='text-xs mt-1'><span className='text-sm text-neutral-700 font-medium'>Date & Time:</span> {slotDateFormat(item.slotDate)} | {item.slotTime}</p>
-            </div>
-            <div></div>
-            <div className='flex flex-col gap-2 justify-end'>
+    <div className='px-4 sm:px-8 md:px-16 max-w-4xl mx-auto'>
+      <p className='pb-3 mt-10 sm:mt-12 font-medium text-zinc-700 border-b text-base sm:text-lg'>
+        My Appointments
+      </p>
 
+      <div className='divide-y'>
+        {appointments.map((item) => (
+          <div key={item._id} className='flex flex-col sm:flex-row gap-4 py-5'>
+
+            {/* Doctor image */}
+            <div className='shrink-0'>
+              <img
+                className='w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover bg-indigo-50'
+                src={item.docData.image}
+                alt={item.docData.name}
+                loading='lazy'
+              />
+            </div>
+
+            {/* Info */}
+            <div className='flex-1 text-sm text-zinc-600 min-w-0'>
+              <p className='text-neutral-800 font-semibold text-base truncate'>{item.docData.name}</p>
+              <p className='text-gray-500'>{item.docData.speciality}</p>
+              <p className='text-zinc-700 font-medium mt-2'>Address:</p>
+              <p className='text-xs text-gray-500'>{item.docData.address?.line1}</p>
+              <p className='text-xs text-gray-500'>{item.docData.address?.line2}</p>
+              <p className='text-xs mt-2'>
+                <span className='text-sm text-neutral-700 font-medium'>Date &amp; Time: </span>
+                {slotDateFormat(item.slotDate)} &nbsp;|&nbsp; {item.slotTime}
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className='flex flex-row sm:flex-col gap-2 sm:justify-end sm:items-end shrink-0 flex-wrap'>
+
+              {/* Cancelled */}
               {item.cancelled && (
-                <button className='sm:min-w-48 py-2 border border-red-500 rounded text-red-500'>
-                  Appointment cancelled
-                </button>
+                <span className='px-4 py-2 border border-red-400 rounded-lg text-red-500 text-xs font-medium'>
+                  Cancelled
+                </span>
               )}
 
+              {/* Active */}
               {!item.cancelled && !item.isCompleted && (
                 <>
                   {item.payment ? (
-                    <button className='sm:min-w-48 py-2 border rounded text-stone-500 bg-indigo-50'>
+                    <span className='px-4 py-2 border rounded-lg text-stone-500 bg-indigo-50 text-xs font-medium'>
                       Paid
-                    </button>
+                    </span>
                   ) : (
                     <button
                       onClick={() => appointmentRazorpay(item._id)}
-                      className='text-sm text-center sm:min-w-48 py-2 border bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:text-white transition-all duration-300'
+                      disabled={loadingId === item._id}
+                      className='px-4 py-2 text-xs font-medium rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap'
                     >
-                      Pay Online
+                      {loadingId === item._id ? 'Processing...' : 'Pay Online'}
                     </button>
                   )}
-
                   <button
                     onClick={() => cancelAppointment(item._id)}
-                    className='text-sm text-stone-500 text-center sm:min-w-48 py-2 border hover:bg-red-600 hover:text-white transition-all duration-300'
+                    disabled={loadingId === item._id}
+                    className='px-4 py-2 text-xs font-medium rounded-lg border border-gray-300 text-stone-500 hover:bg-red-500 hover:text-white hover:border-red-500 transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap'
                   >
-                    Cancel appointment
+                    Cancel
                   </button>
                 </>
               )}
 
+              {/* Completed */}
               {!item.cancelled && item.isCompleted && (
                 <>
-                  <button className='sm:min-w-48 py-2 border border-green-500 text-green-500'>
+                  <span className='px-4 py-2 border border-green-500 rounded-lg text-green-600 text-xs font-medium'>
                     Completed
-                  </button>
-
+                  </span>
                   {item.payment && (
                     <button
-                      onClick={() =>
-                        navigate(`/appointment/${item.docId}`, {
-                          state: { review: true, canReview: true,appointmentId: item._id  }
-                        })
-                      }
-                      className='sm:min-w-48 py-2 border bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:text-white transition-all duration-300'
+                      onClick={() => navigate(`/appointment/${item.docId}`, {
+                        state: { review: true, canReview: true, appointmentId: item._id }
+                      })}
+                      className='px-4 py-2 text-xs font-medium rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 transition whitespace-nowrap'
                     >
                       Give Review
                     </button>
                   )}
                 </>
               )}
-
             </div>
-
-
           </div>
         ))}
       </div>
-    </div >
+    </div>
   )
-
 }
 
 export default MyAppointments

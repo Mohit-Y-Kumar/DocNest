@@ -1,7 +1,8 @@
 import React, { useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppContext } from '../context/AppContext'
-import DoctorCard from './DoctorCard'  // ✅ sirf ye import chahiye
+import DoctorCard from './DoctorCard'
+import { assets } from '../assets/assets'
 
 const TopDoctors = () => {
     const navigate = useNavigate()
@@ -18,15 +19,23 @@ const TopDoctors = () => {
 
             <div className='w-full grid gap-4 gap-y-6 pt-5 px-3 sm:px-0 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]'>
                 {doctors.slice(0, 10).map((item, index) => (
-                    <DoctorCard key={index} item={item} />  // ✅ sirf ye
+                    <DoctorCard key={index} item={item} />
                 ))}
             </div>
 
             <button
                 onClick={() => { navigate('/doctors'); scrollTo(0, 0) }}
-                className='bg-gradient-to-r from-blue-600 to-purple-600 text-white px-10 py-3 rounded-full mt-10 hover:scale-105 transition-all duration-300'
+                className='group flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-full hover:scale-105 transition-all duration-300'
             >
-                View All Doctors
+                <span>View All Doctors</span>
+
+                <span className='transition-transform duration-300 group-hover:translate-x-1'>
+                    <img
+                        src={assets.arrow_icon}
+                        alt="arrow"
+                        className='h-4 w-4'
+                    />
+                </span>
             </button>
         </div>
     )

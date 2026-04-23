@@ -22,7 +22,7 @@ const DoctorCard = ({ item }) => {
             setLiked(item.likedBy?.includes(userData._id) || false)
         }
     }, [userData, item.likedBy])
-    // 👁️ View increment
+
     const handleCardClick = async () => {
         try {
             await axios.post(backendUrl + `/api/doctor/view/${item._id}`)
@@ -34,7 +34,7 @@ const DoctorCard = ({ item }) => {
         scrollTo(0, 0)
     }
 
-    // ❤️ Like toggle
+    
     const handleLike = async (e) => {
         e.stopPropagation()
         if (!token) {
@@ -67,16 +67,16 @@ const DoctorCard = ({ item }) => {
                 alt=""
             />
 
-            {/* ✅ Stats Badges */}
+            {/*  Stats Badges */}
             <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
 
-                {/* 👁️ Views */}
+                {/*  Views */}
                 <StateBadge
                     icon={assets.eye}
                     value={views >= 1000 ? (views / 1000).toFixed(1) + 'k' : views}
                 />
 
-                {/* ❤️ Likes */}
+                {/*  Likes */}
                 <div onClick={handleLike}>
                     <StateBadge
                         icon={liked ? assets.filledheart : assets.heart}
@@ -84,7 +84,7 @@ const DoctorCard = ({ item }) => {
                     />
                 </div>
 
-                {/* 💬 Reviews */}
+                {/*  Reviews */}
                 <StateBadge
                     icon={assets.comment}
                     value={item.totalReviews || 0}
@@ -99,7 +99,7 @@ const DoctorCard = ({ item }) => {
                 <div className='flex items-center justify-between mt-1'>
                     <p className='text-gray-900 text-lg font-medium'>{item.name}</p>
 
-                    {/* ⭐ Rating — name ke right side */}
+                    {/*  Rating  */}
                     <div className='flex items-center gap-1'>
                         <img src={assets.filledStar} alt="star" className='w-4 h-4' />
                         <p className='text-sm text-gray-600'>

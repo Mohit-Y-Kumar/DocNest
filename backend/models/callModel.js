@@ -20,7 +20,7 @@ const callSchema = new mongoose.Schema(
         receiverId: {
             type:     mongoose.Schema.Types.ObjectId,
             required: true,
-            refPath:  'receiverModel'  // dynamic ref
+            refPath:  'receiverModel'  
         },
         receiverModel: {
             type:     String,

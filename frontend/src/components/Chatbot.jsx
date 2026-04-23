@@ -1,180 +1,156 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
-import axios from 'axios';
-import { AppContext } from '../context/AppContext';
-import { useNavigate } from 'react-router-dom';
-import VoiceChat from './VoiceChat';
+import React, { useState, useRef, useEffect, useContext, useCallback } from 'react'
+import axios from 'axios'
+import { AppContext } from '../context/AppContext'
+import { useNavigate } from 'react-router-dom'
+import VoiceChat from './VoiceChat'
+import { assets } from '../assets/assets'
+import { toast } from 'react-toastify'
 
 const quickButtons = [
-    { label: '🤒 Fever', message: 'Mujhe bukhar hai, kaun sa doctor dikhau?' },
-    { label: '🤕 Headache', message: 'Mujhe sir dard ho raha hai, kaun sa doctor dikhau?' },
-    { label: '🤢 Stomach', message: 'Mujhe pet dard ho raha hai, kaun sa doctor dikhau?' },
-    { label: '👁️ Eyes', message: 'Mujhe aankhon mein problem hai, kaun sa doctor dikhau?' },
-    { label: '🧒 Child', message: 'Mera bachha beemar hai, kaun sa doctor dikhau?' },
-    { label: '🌸 Women', message: 'Mujhe gynecologist se milna hai' },
-    { label: '🧴 Skin', message: 'Mujhe skin problem hai, kaun sa doctor dikhau?' },
-    { label: '📅 Book Appt', message: 'Mujhe appointment book karni hai' },
-];
+    { label: 'Fever', icon: assets.feverIcon, message: 'I have a fever. Which doctor should I consult?' },
+    { label: 'Headache', icon: assets.headacheIcon, message: 'I have a headache. Which doctor should I consult?' },
+    { label: 'Stomach Pain', icon: assets.stomachIcon, message: 'I have stomach pain. Which doctor should I consult?' },
+    { label: 'Eyes', icon: assets.eyeiconIcon, message: 'I have an eye problem. Which doctor should I consult?' },
+    { label: 'Child Care', icon: assets.childIcon, message: 'My child is sick. Which doctor should I consult?' },
+    { label: 'Skin', icon: assets.skinIcon, message: 'I have a skin problem. Which doctor should I consult?' },
+    { label: 'Book Appointment', icon: assets.appointiconIcon, message: 'I want to book an appointment.' },
+]
 
+const INITIAL_MESSAGE = {
+    role: 'bot',
+    text: "Hello \uD83D\uDC4B I'm your medical assistant. Please describe your symptoms or book an appointment."
+}
 
 const Chatbot = () => {
-    const { backendUrl, token, doctors } = useContext(AppContext);
-    const navigate = useNavigate();
-    const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState([
-        { role: 'bot', text: 'Hello! 👋 Main aapka medical assistant hun. Apne symptoms batao ya appointment book karo!' }
-    ]);
-    const [conversationHistory, setConversationHistory] = useState([]);
-    const [input, setInput] = useState('');
-    const [loading, setLoading] = useState(false);
+    const { backendUrl, token, doctors } = useContext(AppContext)
+    const navigate = useNavigate()
+
+    const [isOpen, setIsOpen] = useState(false)
+    const [messages, setMessages] = useState([INITIAL_MESSAGE])
+    const [convHistory, setConvHistory] = useState([])
+    const [input, setInput] = useState('')
+    const [loading, setLoading] = useState(false)
     const [suggestedDoctors, setSuggestedDoctors] = useState([])
 
-    // Booking states
-    const [bookingStep, setBookingStep] = useState(null); // null | 'doctor' | 'date' | 'slot' | 'confirm'
-    const [selectedDoctor, setSelectedDoctor] = useState(null);
-    const [selectedDate, setSelectedDate] = useState('');
-    const [selectedSlot, setSelectedSlot] = useState('');
-    const [availableSlots, setAvailableSlots] = useState([]);
+    // Booking flow state management
+    const [bookingStep, setBookingStep] = useState(null)   // null|'doctor'|'date'|'slot'|'confirm'
+    const [selectedDoctor, setSelectedDoctor] = useState(null)
+    const [selectedDate, setSelectedDate] = useState('')
+    const [selectedSlot, setSelectedSlot] = useState('')
+    const [availableSlots, setAvailableSlots] = useState([])
 
-    const messagesEndRef = useRef(null);
+    const messagesEndRef = useRef(null)
     const speakFnRef = useRef(null)
 
-
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, doctors]);
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [messages, suggestedDoctors, bookingStep, loading])
 
+    // Booking helpers
+    const resetBooking = useCallback(() => {
+        setBookingStep(null)
+        setSelectedDoctor(null)
+        setSelectedDate('')
+        setSelectedSlot('')
+        setAvailableSlots([])
+    }, [])
 
-
-    // Reset all booking related states
-    const resetBooking = () => {
-        setBookingStep(null);
-        setSelectedDoctor(null);
-        setSelectedDate('');
-        setSelectedSlot('');
-        setAvailableSlots([]);
-    };
-
-    // Generate available slots (Fixed date parsing)
     const generateSlots = (doctor, dateStr) => {
-        if (!doctor || !dateStr) return [];
-
-        const [year, month, day] = dateStr.split('-'); // Correct: YYYY-MM-DD
-        const slotDate = `${parseInt(day)}_${parseInt(month)}_${year}`;
-
-        const booked = doctor.slots_booked?.[slotDate] || [];
-        const allSlots = [];
+        if (!doctor || !dateStr) return []
+        const [year, month, day] = dateStr.split('-')
+        const slotDate = `${parseInt(day)}_${parseInt(month)}_${year}`
+        const booked = doctor.slots_booked?.[slotDate] || []
+        const allSlots = []
 
         for (let h = 10; h <= 20; h++) {
-            ['00', '30'].forEach(m => {
-                const time = `${h > 12 ? h - 12 : h}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
-                if (!booked.includes(time)) allSlots.push(time);
-            });
+            ;['00', '30'].forEach(m => {
+                const hour = h > 12 ? h - 12 : h
+                const ampm = h >= 12 ? 'PM' : 'AM'
+                const time = `${hour}:${m} ${ampm}`
+                if (!booked.includes(time)) allSlots.push(time)
+            })
         }
-        return allSlots;
-    };
+        return allSlots
+    }
 
-    // Book Appointment
+    // Handle appointment booking
     const bookAppointment = async () => {
-        console.log("🚀 bookAppointment called");
-
         if (!token) {
-            console.log("❌ No token");
-            setMessages(prev => [...prev, { role: 'bot', text: '⚠️ Pehle login karo!' }]);
-            resetBooking();
-            return;
+            setMessages(prev => [...prev, { role: 'bot', text: 'You need to log in before booking an appointment.' }])
+            resetBooking()
+            return
+        }
+        if (!selectedDoctor || !selectedDate || !selectedSlot) {
+            setMessages(prev => [...prev, { role: 'bot', text: 'Some required details are missing.' }])
+            return
         }
 
-        if (!selectedDoctor || !selectedDate || !selectedSlot) {
-            console.log("❌ Missing data", { selectedDoctor, selectedDate, selectedSlot });
-            setMessages(prev => [...prev, { role: 'bot', text: '❌ Kuch details missing hain.' }]);
-            return;
-        }
+        // Save locally before any state reset
+        const doctorSnap = selectedDoctor
+        const dateSnap = selectedDate
+        const slotSnap = selectedSlot
 
         try {
-            const [year, month, day] = selectedDate.split('-');
-            const slotDate = `${parseInt(day)}_${parseInt(month)}_${year}`;
+            const [year, month, day] = dateSnap.split('-')
+            const slotDate = `${parseInt(day)}_${parseInt(month)}_${year}`
 
-            console.log("📤 Sending booking request", {
-                docId: selectedDoctor._id,
-                slotDate,
-                slotTime: selectedSlot
-            });
-
-            setMessages(prev => [...prev, { role: 'bot', text: '🔄 Booking create ho rahi hai...' }]);
+            setLoading(true)
+            setMessages(prev => [...prev, { role: 'bot', text: 'Creating your appointment...' }])
 
             const { data } = await axios.post(
                 `${backendUrl}/api/user/book-appointment`,
-                {
-                    docId: selectedDoctor._id,
-                    slotDate,
-                    slotTime: selectedSlot
-                },
+                { docId: doctorSnap._id, slotDate, slotTime: slotSnap },
                 { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            console.log("📥 Booking response:", data);
+            )
 
             if (data.success && data.appointmentId) {
-
-                const doctorName = selectedDoctor.name
-                const bookingDate = selectedDate
-                const bookingSlot = selectedSlot
-                const bookingFees = selectedDoctor.fees
-
                 resetBooking()
-
-                initiatePayment(data.appointmentId, doctorName, bookingDate, bookingSlot, bookingFees)
+                initiatePayment(data.appointmentId, doctorSnap, dateSnap, slotSnap)
             } else {
-                console.log("❌ Booking failed:", data);
-                setMessages(prev => [...prev, { role: 'bot', text: '❌ Booking failed' }]);
-                resetBooking();
+                setMessages(prev => [...prev, { role: 'bot', text: 'Booking failed. Please try again.' }])
+                resetBooking()
             }
-
-        } catch (error) {
-            console.error("❌ Booking error:", error);
-            setMessages(prev => [...prev, { role: 'bot', text: '❌ Booking error' }]);
-            resetBooking();
+        } catch (err) {
+            console.error('[Chatbot] Booking error:', err)
+            setMessages(prev => [...prev, { role: 'bot', text: 'An error occurred while booking. Please try again.' }])
+            resetBooking()
+        } finally {
+            setLoading(false)
         }
-    };
+    }
 
-    // Razorpay Payment
-    const initiatePayment = async (appointmentId, doctorName, bookingDate, bookingSlot, bookingFees) => {
-        console.log("💳 initiatePayment called with:", appointmentId);
+    // Razorpay payment
+    const initiatePayment = async (appointmentId, doctor, date, slot) => {
+        if (!appointmentId) return
 
-        if (!appointmentId) return;
         if (!window.Razorpay) {
-            console.error('❌ Razorpay not loaded!')
             setMessages(prev => [...prev, {
                 role: 'bot',
-                text: '❌ Payment system load nahi hua — page refresh karo!'
+                text: 'Payment system failed to load. Please refresh and try again.'
             }])
             return
         }
+
         try {
-            setLoading(true);
+            setLoading(true)
 
             const { data } = await axios.post(
                 `${backendUrl}/api/user/payment-razorpay`,
                 { appointmentId },
                 { headers: { Authorization: `Bearer ${token}` } }
-            );
-            console.log('Payment data:', data)
+            )
 
             if (!data.success || !data.order) {
-                console.log('❌ Order failed:', data)
+                setMessages(prev => [...prev, { role: 'bot', text: 'Could not create payment order. Please try again.' }])
                 return
             }
 
-            console.log('✅ Opening Razorpay...')
-
-
-            // ✅ window.Razorpay directly use karo — script already loaded hai
             const options = {
                 key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount: data.order.amount,
                 currency: data.order.currency,
-                name: "Appointment Payment",
-                description: "Doctor Appointment",
+                name: 'Appointment Payment',
+                description: 'Doctor Appointment',
                 order_id: data.order.id,
 
                 handler: async (response) => {
@@ -183,316 +159,333 @@ const Chatbot = () => {
                             `${backendUrl}/api/user/verifyRazorpay`,
                             { response },
                             { headers: { Authorization: `Bearer ${token}` } }
-                        );
-
+                        )
                         if (verify.data.success) {
                             setMessages(prev => [...prev, {
                                 role: 'bot',
-                                text: `💳 Payment successful! ✅\n👨‍⚕️ ${doctorName}\n📅 ${bookingDate}\n⏰ ${bookingSlot}\n💰 ₹${bookingFees}\nAppointment confirm ho gayi!`
-                            }]);
-
-                            setTimeout(() => {
-                                navigate('/my-appointments');
-                            }, 2000);
-
+                                type: 'payment_success',
+                                data: {
+                                    doctorName: doctor.name,
+                                    bookingDate: date,
+                                    bookingSlot: slot,
+                                    bookingFees: doctor.fees
+                                }
+                            }])
+                            setTimeout(() => navigate('/my-appointments'), 2500)
                         } else {
-                            setMessages(prev => [...prev, {
-                                role: 'bot',
-                                text: '❌ Payment verification failed.'
-                            }]);
+                            setMessages(prev => [...prev, { role: 'bot', text: 'Payment verification failed. Please contact support.' }])
                         }
                     } catch (err) {
-                        console.error("❌ Verify error:", err);
+                        console.error('[Chatbot] Verify error:', err)
+                        setMessages(prev => [...prev, { role: 'bot', text: 'Payment verification failed.' }])
                     }
                 },
+
                 modal: {
-                    // ✅ Modal close hone pe bhi handle karo
                     ondismiss: () => {
-                        setMessages(prev => [...prev, {
-                            role: 'bot',
-                            text: '⚠️ Payment cancel ho gayi.'
-                        }])
+                        setMessages(prev => [...prev, { role: 'bot', text: 'Payment was cancelled.' }])
                     }
                 },
-
-                theme: { color: "#6366f1" }
-            };
-
-            const rzp = new window.Razorpay(options);
-            rzp.open();
-
-        } catch (error) {
-            console.error("❌ Payment error:", error)
-            setMessages(prev => [...prev, {
-                role: 'bot',
-                text: '❌ Payment mein error aa gayi.'
-            }])
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const sendMessage = async (directMessage = null) => {
-        const userMessage = directMessage || input.trim();
-        if (!userMessage) return;
-
-        setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
-        setInput('');
-        setLoading(true);
-        setSuggestedDoctors([])  // ✅ reset suggested doctors
-
-        // Booking Intent Check
-        const lowerMsg = userMessage.toLowerCase();
-        if (lowerMsg.includes('appointment') || lowerMsg.includes('book') || lowerMsg.includes('booking')) {
-            if (token) {
-                setBookingStep('doctor');
-                setMessages(prev => [...prev, {
-                    role: 'bot',
-                    text: '📅 Konse doctor se appointment book karni hai? Neeche se select karo:'
-                }]);
-            } else {
-                setMessages(prev => [...prev, {
-                    role: 'bot',
-                    text: '⚠️ Appointment book karne ke liye pehle login karo!'
-                }]);
+                theme: { color: '#6366f1' }
             }
-            setLoading(false);
-            return;
+
+            const rzp = new window.Razorpay(options)
+            rzp.open()
+
+        } catch (err) {
+            console.error('[Chatbot] Payment error:', err)
+            setMessages(prev => [...prev, { role: 'bot', text: 'An error occurred during payment. Please try again.' }])
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // Send message to AI backend
+    const sendMessage = useCallback(async (directMessage = null, lang = 'en') => {
+        const userMessage = (directMessage || input).trim()
+        if (!userMessage || loading) return
+
+        setMessages(prev => [...prev, { role: 'user', text: userMessage }])
+        setInput('')
+        setLoading(true)
+        setSuggestedDoctors([])
+
+        // Booking intent detection
+        const lower = userMessage.toLowerCase()
+        if (lower.includes('appointment') || lower.includes('book') || lower.includes('booking')) {
+            if (token) {
+                setBookingStep('doctor')
+                setMessages(prev => [...prev, { role: 'bot', type: 'appointment_select' }])
+            } else {
+                setMessages(prev => [...prev, { role: 'bot', type: 'login_required' }])
+            }
+            setLoading(false)
+            return
         }
 
-        // Normal AI Chat
-        const newHistory = [...conversationHistory, { role: 'user', content: userMessage }];
+        // AI chat
+        const newHistory = [...convHistory, { role: 'user', content: userMessage }]
 
         try {
-            const { data } = await axios.post(
-                `${backendUrl}/api/chat/message`,
-                {
-                    message: userMessage,
-                    conversationHistory,
-                    doctors: doctors?.slice(0, 10)
-                }
-            );
+            const { data } = await axios.post(`${backendUrl}/api/chat/message`, {
+                message: userMessage,
+                conversationHistory: convHistory,
+                doctors: doctors?.slice(0, 10),
+            })
 
             if (data.success) {
-                let reply = data.reply
+                let reply = data.reply || ''
                 let detectedSpeciality = null
 
-                // ✅ SPECIALITY tag detect karo
                 if (reply.includes('SPECIALITY:')) {
                     const parts = reply.split('SPECIALITY:')
                     reply = parts[0].trim()
                     detectedSpeciality = parts[1].trim()
-
-                    const filtered = doctors?.filter(
-                        doc => doc.speciality === detectedSpeciality
-                    ).slice(0, 3)
-
+                    const filtered = doctors?.filter(d => d.speciality === detectedSpeciality).slice(0, 3)
                     setSuggestedDoctors(filtered || [])
                 }
 
-                setConversationHistory([...newHistory, { role: 'assistant', content: reply }])
+                setConvHistory([...newHistory, { role: 'assistant', content: reply }])
                 setMessages(prev => [...prev, { role: 'bot', text: reply }])
 
-                if (speakFnRef.current) {
-                    speakFnRef.current(reply)
-                }
+                // Speak the reply
+                speakFnRef.current?.(reply, 'en')
             } else {
-                setMessages(prev => [...prev, { role: 'bot', text: 'Sorry, kuch error aa gaya.' }]);
+                setMessages(prev => [...prev, { role: 'bot', text: 'Sorry, something went wrong. Please try again.' }])
             }
-        } catch (error) {
-            setMessages(prev => [...prev, { role: 'bot', text: 'Server se connect nahi ho pa raha.' }]);
+        } catch (err) {
+            const status = err?.response?.status
+            const msg = err?.response?.data?.message || ''
+
+            if (status === 429) {
+                toast.error(` ${msg || 'Rate limit reached. Please wait and try again.'}`, {
+                    autoClose: 6000
+                })
+                setMessages(prev => [...prev, {
+                    role: 'bot',
+                    text: msg || 'Rate limit reached. Please wait a moment and try again.'
+                }])
+            } else {
+                setMessages(prev => [...prev, {
+                    role: 'bot',
+                    text: 'Unable to connect to the server. Please try again later.'
+                }])
+            }
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }, [input, loading, token, convHistory, doctors, backendUrl])
 
     const handleKeyPress = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
+            e.preventDefault()
+            sendMessage()
         }
-    };
+    }
+
+    const renderMessage = (msg) => {
+        switch (msg.type) {
+            case 'payment_success': return <PaymentSuccessUI msg={msg} />
+            case 'appointment_select': return <AppointmentSelectUI />
+            case 'login_required': return <LoginRequiredUI />
+            case 'slot_selected': return <SlotSelectedUI msg={msg} />
+            default: return <span>{msg.text}</span>
+        }
+    }
 
     return (
         <>
-            {/* Chat Button */}
+            {/* Toggle button */}
             <button
-                onClick={() => setIsOpen(prev => !prev)}
+                onClick={() => setIsOpen(p => !p)}
+                aria-label={isOpen ? 'Close chat' : 'Open chat'}
                 className='fixed bottom-6 right-6 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all duration-300'
             >
-                {isOpen ? '✕' : '💬'}
+                <img
+                    src={isOpen ? assets.crossIcon : assets.chatIcon}
+                    alt='chat'
+                    className='w-6 h-6'
+                />
             </button>
 
             {isOpen && (
-                <div className='fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden'>
+                <div className='fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden max-h-[85vh]'>
 
                     {/* Header */}
-                    <div className='bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 flex items-center gap-3'>
-                        <div className='w-8 h-8 bg-white rounded-full flex items-center justify-center text-lg'>🤖</div>
-                        <div>
+                    <div className='bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 flex items-center gap-3 shrink-0'>
+                        <div className='w-8 h-8 bg-white rounded-full flex items-center justify-center overflow-hidden shrink-0'>
+                            <img src={assets.robotIcon} alt='bot' className='w-5 h-5 object-contain' />
+                        </div>
+                        <div className='flex-1 min-w-0'>
                             <p className='text-white font-semibold text-sm'>Medical Assistant</p>
-                            <p className='text-blue-100 text-xs'>Online • Kuch bhi pucho</p>
+                            <p className='text-blue-100 text-xs'>Online • How can I help you?</p>
                         </div>
                         <button
                             onClick={() => {
-                                setMessages([{ role: 'bot', text: 'Hello! 👋 Main aapka medical assistant hun!' }]);
-                                setConversationHistory([]);
-                                resetBooking();
+                                setMessages([INITIAL_MESSAGE])
+                                setConvHistory([])
+                                setSuggestedDoctors([])
+                                resetBooking()
                             }}
-                            className='ml-auto text-blue-100 text-xs hover:text-white'
+                            className='text-blue-100 text-xs hover:text-white border border-blue-200 px-2 py-1 rounded-md hover:bg-blue-500/20 transition shrink-0'
                         >
                             Clear
                         </button>
                     </div>
 
-                    {/* Messages Area */}
-                    <div className='flex-1 overflow-y-auto p-4 space-y-3 max-h-80'>
+                    {/* Messages */}
+                    <div className='flex-1 overflow-y-auto p-4 space-y-3'>
 
-                        {/* Quick Buttons - Show only at start */}
+                        {/* Quick buttons  */}
                         {messages.length === 1 && (
                             <div className='mb-3'>
-                                <p className='text-xs text-gray-400 mb-2 text-center'>Quick select karo 👇</p>
+                                <p className='text-xs text-gray-400 mb-2 text-center'>Choose a quick option to get started</p>
                                 <div className='flex flex-wrap gap-2'>
-                                    {quickButtons.map((btn, index) => (
+                                    {quickButtons.map((btn, i) => (
                                         <button
-                                            key={index}
+                                            key={i}
                                             onClick={() => sendMessage(btn.message)}
-                                            className='text-xs bg-indigo-50 border border-indigo-200 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition'
+                                            className='flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition'
                                         >
-                                            {btn.label}
+                                            <img src={btn.icon} alt={btn.label} className='w-4 h-4' />
+                                            <span>{btn.label}</span>
                                         </button>
                                     ))}
                                 </div>
                             </div>
                         )}
 
-                        {messages.map((msg, index) => (
-
-
-                            <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm whitespace-pre-line ${msg.role === 'user'
-                                    ? 'bg-indigo-600 text-white rounded-br-none'
-                                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                                    }`}>
-                                    {msg.text}
+                        {/* Message list */}
+                        {messages.map((msg, i) => (
+                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[82%] px-3 py-2 rounded-2xl text-sm whitespace-pre-line
+                                    ${msg.role === 'user'
+                                        ? 'bg-indigo-600 text-white rounded-br-none'
+                                        : 'bg-gray-100 text-gray-800 rounded-bl-none'}`}>
+                                    {renderMessage(msg)}
                                 </div>
                             </div>
                         ))}
-                        {/* Suggested Doctors */}
+
+                        {/* Suggested doctors */}
                         {suggestedDoctors.length > 0 && (
                             <div className='bg-indigo-50 p-3 rounded-xl'>
-                                <p className='text-xs text-gray-500 mb-2'>
-                                    👨‍⚕️ Suggested Doctors:
+                                <p className='text-xs text-gray-500 mb-2 flex items-center gap-1'>
+                                    <img className='h-4 w-4' src={assets.docIcon} alt='' />
+                                    Recommended Doctors
                                 </p>
-                                {suggestedDoctors.map((doc, index) => (
+                                {suggestedDoctors.map((doc, i) => (
                                     <div
-                                        key={index}
-                                        onClick={() => {
-                                            navigate(`/appointment/${doc._id}`)
-                                            setIsOpen(false)
-                                        }}
+                                        key={i}
+                                        onClick={() => { navigate(`/appointment/${doc._id}`); setIsOpen(false) }}
                                         className='bg-white p-2 rounded-lg mb-2 cursor-pointer hover:bg-indigo-50 transition border border-indigo-100'
                                     >
                                         <div className='flex items-center gap-2'>
-                                            <img
-                                                src={doc.image}
-                                                alt={doc.name}
-                                                className='w-10 h-10 rounded-full object-cover'
-                                            />
-                                            <div className='flex-1'>
-                                                <p className='text-sm font-medium text-gray-800'>{doc.name}</p>
+                                            <img src={doc.image} alt={doc.name} className='w-10 h-10 rounded-full object-cover shrink-0' />
+                                            <div className='flex-1 min-w-0'>
+                                                <p className='text-sm font-medium text-gray-800 truncate'>{doc.name}</p>
                                                 <p className='text-xs text-gray-500'>{doc.speciality}</p>
                                                 <div className='flex items-center gap-1'>
-                                                    <span className='text-yellow-400 text-xs'>⭐</span>
+                                                    <img className='h-3.5 w-3.5' src={assets.filledStar} alt='star' />
                                                     <span className='text-xs text-gray-500'>{doc.averageRating || '0.0'}</span>
-                                                    <span className='text-xs text-gray-400 ml-2'>₹{doc.fees}</span>
+                                                    <span className='text-xs text-gray-400 ml-1'>&#8377;{doc.fees}</span>
                                                 </div>
                                             </div>
-                                            <button className='text-xs bg-indigo-600 text-white px-2 py-1 rounded-full'>
-                                                Book
-                                            </button>
+                                            <span className='text-xs bg-indigo-600 text-white px-2 py-1 rounded-full shrink-0'>Book</span>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        {/* Booking Steps */}
+                        {/*  Booking steps  */}
                         {bookingStep === 'doctor' && (
                             <div className='bg-indigo-50 p-3 rounded-xl'>
-                                <p className='text-xs text-gray-500 mb-2'>Doctor select karo:</p>
+                                <p className='text-xs text-gray-500 mb-2'>Please select a doctor</p>
                                 <select
-                                    onChange={(e) => {
-                                        const doc = doctors.find(d => d._id === e.target.value);
-                                        setSelectedDoctor(doc);
+                                    onChange={e => {
+                                        const doc = doctors?.find(d => d._id === e.target.value) || null
+                                        setSelectedDoctor(doc)
                                     }}
-                                    className='w-full border rounded-lg p-2 text-sm mb-2'
+                                    className='w-full border rounded-lg p-2 text-sm mb-2 bg-white'
+                                    defaultValue=''
                                 >
-                                    <option value=''>-- Doctor chuno --</option>
+                                    <option value='' disabled>Choose a doctor</option>
                                     {doctors?.map(doc => (
                                         <option key={doc._id} value={doc._id}>
-                                            {doc.name} — {doc.speciality} — ₹{doc.fees}
+                                            {doc.name} — {doc.speciality} — &#8377;{doc.fees}
                                         </option>
                                     ))}
                                 </select>
                                 <button
                                     onClick={() => {
-                                        if (!selectedDoctor) return;
-                                        setBookingStep('date');
+                                        if (!selectedDoctor) return
+                                        setBookingStep('date')
                                         setMessages(prev => [...prev, {
                                             role: 'bot',
-                                            text: `✅ ${selectedDoctor.name} select kiya. Ab date chuno:`
-                                        }]);
+                                            text: `${selectedDoctor.name} selected. Please choose a date.`
+                                        }])
                                     }}
                                     disabled={!selectedDoctor}
-                                    className='w-full bg-indigo-600 text-white py-1.5 rounded-lg text-sm disabled:opacity-50'
+                                    className='mx-auto flex items-center gap-1 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700 transition'
                                 >
-                                    Next →
+                                    <span className='flex items-center gap-1'>
+                                        Next
+                                        <img src={assets.arrow_icon} alt="arrow" className='h-4 w-4' />
+                                    </span>
                                 </button>
                             </div>
                         )}
 
                         {bookingStep === 'date' && (
                             <div className='bg-indigo-50 p-3 rounded-xl'>
-                                <p className='text-xs text-gray-500 mb-2'>Date select karo:</p>
+                                <p className='text-xs text-gray-500 mb-2'>Select a date</p>
                                 <input
                                     type='date'
                                     min={new Date().toISOString().split('T')[0]}
                                     value={selectedDate}
-                                    onChange={(e) => setSelectedDate(e.target.value)}
-                                    className='w-full border rounded-lg p-2 text-sm mb-2'
+                                    onChange={e => setSelectedDate(e.target.value)}
+                                    className='w-full border rounded-lg p-2 text-sm mb-2 bg-white'
                                 />
                                 <button
                                     onClick={() => {
-                                        if (!selectedDate) return;
-                                        const slots = generateSlots(selectedDoctor, selectedDate);
-                                        setAvailableSlots(slots);
-                                        setBookingStep('slot');
+                                        if (!selectedDate) return
+                                        const slots = generateSlots(selectedDoctor, selectedDate)
+                                        if (slots.length === 0) {
+                                            setMessages(prev => [...prev, { role: 'bot', text: 'No slots available on this date. Please choose another date.' }])
+                                            return
+                                        }
+                                        setAvailableSlots(slots)
+                                        setBookingStep('slot')
                                         setMessages(prev => [...prev, {
                                             role: 'bot',
-                                            text: `📅 ${selectedDate} select kiya. Ab time slot chuno:`
-                                        }]);
+                                            text: `Date selected: ${selectedDate}. Please choose a time slot.`
+                                        }])
                                     }}
                                     disabled={!selectedDate}
-                                    className='w-full bg-indigo-600 text-white py-1.5 rounded-lg text-sm disabled:opacity-50'
+
+                                    className='mx-auto flex items-center gap-1 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700 transition'
                                 >
-                                    Next →
+                                    <span className='flex items-center gap-1'>
+                                        Next
+                                        <img src={assets.arrow_icon} alt="arrow" className='h-4 w-4' />
+                                    </span>
                                 </button>
                             </div>
                         )}
 
                         {bookingStep === 'slot' && (
                             <div className='bg-indigo-50 p-3 rounded-xl'>
-                                <p className='text-xs text-gray-500 mb-2'>Time slot select karo:</p>
+                                <p className='text-xs text-gray-500 mb-2'>Select a time slot</p>
                                 <div className='flex flex-wrap gap-1 mb-2 max-h-32 overflow-y-auto'>
                                     {availableSlots.map((slot, i) => (
                                         <button
                                             key={i}
                                             onClick={() => setSelectedSlot(slot)}
-                                            className={`text-xs px-3 py-1 rounded-full border transition ${selectedSlot === slot
-                                                ? 'bg-indigo-600 text-white'
-                                                : 'bg-white text-gray-600 hover:bg-indigo-50'
-                                                }`}
+                                            className={`text-xs px-3 py-1 rounded-full border transition
+                                                ${selectedSlot === slot
+                                                    ? 'bg-indigo-600 text-white border-indigo-600'
+                                                    : 'bg-white text-gray-600 hover:bg-indigo-50 border-gray-200'}`}
                                         >
                                             {slot}
                                         </button>
@@ -500,87 +493,159 @@ const Chatbot = () => {
                                 </div>
                                 <button
                                     onClick={() => {
-                                        if (!selectedSlot) return;
-                                        setBookingStep('confirm');
+                                        if (!selectedSlot) return
+                                        setBookingStep('confirm')
                                         setMessages(prev => [...prev, {
                                             role: 'bot',
-                                            text: `⏰ ${selectedSlot} select kiya.\n\n📋 Confirm karo:\n👨‍⚕️ ${selectedDoctor.name}\n📅 ${selectedDate}\n⏰ ${selectedSlot}\n💰 ₹${selectedDoctor.fees}`
-                                        }]);
+                                            type: 'slot_selected',
+                                            data: { selectedDoctor, selectedDate, selectedSlot }
+                                        }])
                                     }}
                                     disabled={!selectedSlot}
-                                    className='w-full bg-indigo-600 text-white py-1.5 rounded-lg text-sm disabled:opacity-50'
+                                    className='mx-auto flex items-center gap-1 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700 transition'
+
                                 >
-                                    Next →
+                                    <span className='flex items-center gap-1'>
+                                        Next
+                                        <img src={assets.arrow_icon} alt="arrow" className='h-4 w-4' />
+                                    </span>
                                 </button>
                             </div>
                         )}
 
                         {bookingStep === 'confirm' && (
                             <div className='bg-indigo-50 p-3 rounded-xl'>
-                                <p className='text-xs text-gray-500 mb-2'>Final confirm karo:</p>
+                                <p className='text-xs text-gray-500 mb-3'>Confirm your appointment details.</p>
                                 <button
                                     onClick={bookAppointment}
                                     disabled={loading}
-                                    className='w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 rounded-lg text-sm font-medium mb-2 disabled:opacity-50'
+                                    className='w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 rounded-lg text-sm font-medium mb-2 disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90 transition'
                                 >
-                                    {loading ? '⏳ Processing...' : `💳 Book & Pay ₹${selectedDoctor?.fees}`}
+                                    {loading
+                                        ? <><img src={assets.loadingIcon} className='w-4 h-4 animate-spin' alt='' /> Processing...</>
+                                        : <>Book &amp; Pay &#8377;{selectedDoctor?.fees}</>
+                                    }
                                 </button>
                                 <button
                                     onClick={() => {
-                                        setMessages(prev => [...prev, { role: 'bot', text: 'Booking cancelled.' }]);
-                                        resetBooking();
+                                        setMessages(prev => [...prev, { role: 'bot', text: 'Booking cancelled.' }])
+                                        resetBooking()
                                     }}
                                     disabled={loading}
-                                    className='w-full border text-gray-500 py-1.5 rounded-lg text-sm disabled:opacity-50'
+                                    className='w-full border text-gray-500 py-1.5 rounded-lg text-sm disabled:opacity-50 hover:bg-gray-50 transition'
                                 >
                                     Cancel
                                 </button>
                             </div>
                         )}
 
-                        {/* Loading */}
+                        {/* Typing indicator */}
                         {loading && (
                             <div className='flex justify-start'>
-                                <div className='bg-gray-100 px-4 py-2 rounded-2xl rounded-bl-none'>
+                                <div className='bg-gray-100 px-4 py-3 rounded-2xl rounded-bl-none'>
                                     <div className='flex gap-1'>
-                                        <span className='w-2 h-2 bg-gray-400 rounded-full animate-bounce' style={{ animationDelay: '0ms' }}></span>
-                                        <span className='w-2 h-2 bg-gray-400 rounded-full animate-bounce' style={{ animationDelay: '150ms' }}></span>
-                                        <span className='w-2 h-2 bg-gray-400 rounded-full animate-bounce' style={{ animationDelay: '300ms' }}></span>
+                                        <span className='w-2 h-2 bg-gray-400 rounded-full animate-bounce' style={{ animationDelay: '0ms' }} />
+                                        <span className='w-2 h-2 bg-gray-400 rounded-full animate-bounce' style={{ animationDelay: '150ms' }} />
+                                        <span className='w-2 h-2 bg-gray-400 rounded-full animate-bounce' style={{ animationDelay: '300ms' }} />
                                     </div>
                                 </div>
                             </div>
                         )}
+
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Input Area - Disabled during booking */}
-                    <div className='border-t p-3 flex gap-2'>
-
+                    {/* Input area */}
+                    <div className='border-t p-3 flex gap-2 items-center shrink-0'>
                         <VoiceChat
-                            onTranscript={(text) => sendMessage(text)}
-                            onSpeak={(fn) => { speakFnRef.current = fn }}
+                            onTranscript={({ text, lang }) => sendMessage(text, lang)}
+                            onSpeak={fn => { speakFnRef.current = fn }}
                         />
                         <input
                             type='text'
                             value={input}
-                            onChange={(e) => setInput(e.target.value)}
+                            onChange={e => setInput(e.target.value)}
                             onKeyDown={handleKeyPress}
-                            placeholder={bookingStep ? 'Booking chal rahi hai...' : 'Kuch bhi pucho...'}
-                            className='flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-indigo-400'
+                            placeholder={bookingStep ? 'Booking in progress...' : 'Ask anything...'}
                             disabled={loading || bookingStep !== null}
+                            className='flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-indigo-400 disabled:bg-gray-50 min-w-0'
                         />
                         <button
                             onClick={() => sendMessage()}
                             disabled={loading || !input.trim() || bookingStep !== null}
-                            className='bg-indigo-600 text-white w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-50 hover:bg-indigo-700 transition'
+                            className='bg-indigo-600 text-white w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-50 hover:bg-indigo-700 transition shrink-0'
                         >
-                            ➤
+                            <img className='h-5 w-5' src={assets.sendMsgIcon} alt='send' />
                         </button>
                     </div>
                 </div>
             )}
         </>
-    );
-};
+    )
+}
 
-export default Chatbot;
+//  display sub-components 
+const SlotSelectedUI = ({ msg }) => {
+    const { selectedDoctor, selectedDate, selectedSlot } = msg.data || {}
+    return (
+        <div className='space-y-2 text-sm'>
+            <p className='font-semibold text-gray-800'>Please confirm your appointment details</p>
+            <p className='flex items-center gap-2'>
+                <img src={assets.docIcon} className='w-4 h-4 shrink-0' alt='' />
+                {selectedDoctor?.name}
+            </p>
+            <p className='flex items-center gap-2'>
+                <img src={assets.appointiconIcon} className='w-4 h-4 shrink-0' alt='' />
+                {selectedDate}
+            </p>
+            <p className='flex items-center gap-2'>
+                <img src={assets.clockIcon} className='w-4 h-4 shrink-0' alt='' />
+                {selectedSlot}
+            </p>
+            <p className='flex items-center gap-2'>
+                <img src={assets.earningIcon} className='w-4 h-4 shrink-0' alt='' />
+                &#8377;{selectedDoctor?.fees}
+            </p>
+        </div>
+    )
+}
+
+const PaymentSuccessUI = ({ msg }) => (
+    <div className='space-y-2 text-sm'>
+        <p className='font-semibold text-green-700'>Payment successful!</p>
+        <p className='flex items-center gap-2'>
+            <img src={assets.docIcon} className='w-4 h-4 shrink-0' alt='' />
+            {msg.data.doctorName}
+        </p>
+
+        <p className='flex items-center gap-2'>
+            <img src={assets.appointiconIcon} className='w-4 h-4 shrink-0' alt='' />
+            {msg.data.bookingDate}
+        </p>
+        <p className='flex items-center gap-2'>
+            <img src={assets.clockIcon} className='w-4 h-4 shrink-0' alt='' />
+            {msg.data.bookingSlot}
+        </p>
+        <p className='flex items-center gap-2'>
+            <img src={assets.earningIcon} className='w-4 h-4 shrink-0' alt='' />
+            &#8377;{msg.data.bookingFees}
+        </p>
+        <p className='text-green-600 font-medium'>Appointment confirmed! Redirecting...</p>
+    </div>
+)
+
+const AppointmentSelectUI = () => (
+    <p className='flex items-center gap-2 text-gray-700 font-medium text-sm'>
+        <img src={assets.appointiconIcon} className='w-4 h-4 shrink-0' alt='' />
+        Select a doctor below to continue with your appointment.
+    </p>
+)
+
+const LoginRequiredUI = () => (
+    <p className='flex items-center gap-2 text-red-600 font-medium text-sm'>
+        <img src={assets.appointiconIcon} className='w-4 h-4 shrink-0' alt='' />
+        Please log in to book an appointment.
+    </p>
+)
+
+export default Chatbot

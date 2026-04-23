@@ -36,7 +36,7 @@ const addDoctor = async (req, res) => {
 
         //validating email format
 
-        //  Email format validation
+    
         if (!validator.isEmail(email)) {
             return res.status(400).json({
                 success: false,
@@ -52,18 +52,21 @@ const addDoctor = async (req, res) => {
             });
         }
 
+        const existing = await doctorModel.findOne({ email })
+        if (existing) {
+            return res.status(409).json({ success: false, message: 'A doctor with this email already exists.' })
+        }
+
         //hashig password
         const salt = await bcrypt.genSalt(10)
         const hashPassword = await bcrypt.hash(password, salt)
 
         //upload img to cloudinary
         const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" })
-        const imageUrl = imageUpload.secure_url
-
-        const doctorData = {
+        const newDoctor = new doctorModel({
             name,
             email,
-            image: imageUrl,
+            image: imageUpload.secure_url,
             password: hashPassword,
             speciality,
             degree,
@@ -72,12 +75,10 @@ const addDoctor = async (req, res) => {
             fees,
             address: JSON.parse(address),
             date: Date.now()
+        })
 
-        }
-
-        const newDoctor = new doctorModel(doctorData)
         await newDoctor.save()
-        res.status(201).json({ success: true, message: "Doctor Added" })
+        return res.status(201).json({ success: true, message: 'Doctor added successfully.' })
 
 
 
@@ -93,19 +94,27 @@ const loginAdmin = async (req, res) => {
     try {
         const { email, password } = req.body
 
-        if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
-
-            const token = jwt.sign(email + password, process.env.JWT_SECRET)
-            res.json({ success: true, token })
-
-        } else {
-            res.json({ success: false, message: "Invalid credentials" })
+        if (!email || !password) {
+            return res.status(400).json({ success: false, message: 'Email and password are required.' })
         }
 
 
+        if (email !== process.env.ADMIN_EMAIL || password !== process.env.ADMIN_PASSWORD) {
+            return res.status(401).json({ success: false, message: 'Invalid credentials.' })
+        }
+
+        const token = jwt.sign(
+            { role: 'admin', email },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        )
+
+        return res.json({ success: true, token })
+
+
     } catch (error) {
-        console.log(error)
-        res.status(500).json({ success: false, message: error.message })
+        console.error('[loginAdmin]', error.message)
+        return res.status(500).json({ success: false, message: 'Internal server error.' })
     }
 }
 
@@ -113,28 +122,23 @@ const loginAdmin = async (req, res) => {
 // api for get all doctors list for admin panel
 const allDoctors = async (req, res) => {
     try {
-
         const doctors = await doctorModel.find({}).select('-password')
-        res.json({ success: true, doctors })
-
+        return res.json({ success: true, doctors })
     } catch (error) {
-        console.log(error)
-        res.status(500).json({ success: false, message: error.message })
+        console.error('[allDoctors]', error.message)
+        return res.status(500).json({ success: false, message: 'Internal server error.' })
     }
 }
+
 
 // api to get all appointment list
 const appointmentsAdmin = async (req, res) => {
     try {
         const appointments = await appointmentModel.find({})
-        res.json({ success: true, appointments})
-
-
-    }
-    catch (error) {
-        console.log(error)
-        res.status(500).json({ success: false, message: error.message })
-
+        return res.json({ success: true, appointments })
+    } catch (error) {
+        console.error('[appointmentsAdmin]', error.message)
+        return res.status(500).json({ success: false, message: 'Internal server error.' })
     }
 }
 
@@ -142,72 +146,83 @@ const appointmentsAdmin = async (req, res) => {
 
 const appointmentCancel = async (req, res) => {
     try {
-        const { appointmentId } = req.body;
+        const { appointmentId } = req.body
 
-        // 1️⃣ Appointment exist or not
-        const appointmentData = await appointmentModel.findById(appointmentId);
-
+        const appointmentData = await appointmentModel.findById(appointmentId)
         if (!appointmentData) {
-            return res.json({ success: false, message: "Appointment not found" });
+            return res.status(404).json({ success: false, message: 'Appointment not found.' })
         }
 
-
-        // 3️⃣ If already cancelled?
-        if (appointmentData.cancelled === true) {
-            return res.json({ success: false, message: "Already cancelled" });
+        if (appointmentData.cancelled) {
+            return res.status(409).json({ success: false, message: 'Appointment is already cancelled.' })
         }
 
-      // 3️⃣ Mark the appointment as cancelled
-        appointmentData.cancelled = true;
-        await appointmentData.save(); 
+        appointmentData.cancelled = true
+        await appointmentData.save()
 
-        
+        const { docId, slotDate, slotTime } = appointmentData
+        const doctorData = await doctorModel.findById(docId)
 
-        // Release doctor slot
-        const { docId, slotDate, slotTime } = appointmentData;
+        if (doctorData) {
+            let slots_booked = doctorData.slots_booked
+            if (slots_booked[slotDate]) {
+                slots_booked[slotDate] = slots_booked[slotDate].filter(e => e !== slotTime)
+                await doctorModel.findByIdAndUpdate(docId, { slots_booked })
+            }
+        }
 
-        const doctorData = await doctorModel.findById(docId);
-        let slots_booked = doctorData.slots_booked;
-
-
-        slots_booked[slotDate] = slots_booked[slotDate].filter(e => e != slotTime);
-
-        await doctorModel.findByIdAndUpdate(docId, { slots_booked })
-
-        return res.json({
-            success: true,
-            message: "Appointment cancelled successfully"
-        });
+        return res.json({ success: true, message: 'Appointment cancelled successfully.' })
 
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({ success: false, message: error.message });
-    }
-};
-
-//api to get dashboard data for adminpanel
-const adminDashboard =async (req,res) =>{
-    try{
-
-        const doctors = await doctorModel.find({})
-        const users = await userModel.find({})
-        const appointments  = await appointmentModel.find({})
-
-        const dashData ={
-            doctors:doctors.length,
-            appointments:appointments.length,
-            patients:users.length,
-            latestAppointments:appointments.reverse().slice(0,5)
-        }
-         return res.json({
-            success: true,
-            dashData,
-        });
-
-    }catch (error) {
-        console.log(error);
-        return res.status(500).json({ success: false, message: error.message });
+        console.error('[appointmentCancel]', error.message)
+        return res.status(500).json({ success: false, message: 'Internal server error.' })
     }
 }
 
-export { addDoctor, loginAdmin, allDoctors,appointmentsAdmin ,appointmentCancel ,adminDashboard}
+//api to get dashboard data for adminpanel
+const adminDashboard = async (req, res) => {
+    try {
+        const [doctors, users, appointments] = await Promise.all([
+            doctorModel.find({}).select('_id'),
+            userModel.find({}).select('_id'),
+            appointmentModel.find({})
+        ])
+
+        const revenue = appointments
+            .filter(a => a.payment)
+            .reduce((sum, a) => sum + (a.amount || 0), 0)
+
+        const now = new Date()
+        const todayDay = now.getDate()
+        const todayMo = now.getMonth() + 1
+        const todayYr = now.getFullYear()
+
+        const cancelledToday = appointments.filter(a => {
+            if (!a.cancelled || !a.slotDate) return false
+            const p = a.slotDate.split('_')
+            if (p.length !== 3) return false
+            return (
+                parseInt(p[0], 10) === todayDay &&
+                parseInt(p[1], 10) === todayMo &&
+                parseInt(p[2], 10) === todayYr
+            )
+        }).length
+
+        const dashData = {
+            doctors: doctors.length,
+            appointments: appointments.length,
+            patients: users.length,
+            revenue,
+            cancelledToday,
+            latestAppointments: [...appointments].reverse().slice(0, 5)
+        }
+
+        return res.json({ success: true, dashData })
+
+    } catch (error) {
+        console.error('[adminDashboard]', error.message)
+        return res.status(500).json({ success: false, message: 'Internal server error.' })
+    }
+}
+
+export { addDoctor, loginAdmin, allDoctors, appointmentsAdmin, appointmentCancel, adminDashboard }

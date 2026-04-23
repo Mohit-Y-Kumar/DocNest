@@ -12,7 +12,70 @@ import appointments_icon from './appointments_icon.svg'
 import earning_icon from './earning_icon.svg'
 import patients_icon from './patients_icon.svg'
 
+import videoCallIcon from './videocall.svg'
+import audioCallIcon from './audiocall.svg'
+import incomingIcon from './incomingicon.svg'
+import bellIcon from './bell.svg'
+import callEndIcon from './callend.svg'
+import audioIcon from './audioicon.svg'
+import micIcon from './mic.svg'
+import muteMicIcon from './mic-mute.svg'
+import videoIcon from './videoicon.svg'
+import muteVideoIcon from './muteVideoicon.svg'
+
+import chattingIcon from './chating.svg'
+import onlineIcon from './online.svg'
+import offlineIcon from './offline.svg'
+import crossIcon from './cross.svg'
+import waitingIcon from './waiting.svg'
+import readIcon from './read.svg'
+import sendIcon from './send.svg'
+import attachIcon from './attach.svg'
+import sendMsgIcon from './sendicon.svg'
+import clockIcon from './clock.svg'
+import userIcon from './usericon.svg'
+
+import regIcon from './stethoscope.png'
+import TotalAppIcon from './total-appointmet.png'
+import regUserIcon from './patient.png'
+import pendingIcon from './pending.png'
+import collIcon from './wage.png'
+import appCancelIcon from './cancel-booking.png'
+import appCompIcon from './apppointment-complete.png'
+import filledStar from './yellowStar.svg'
+
+
+
 export const assets = {
+    filledStar,
+    regIcon,
+    TotalAppIcon,
+    regUserIcon,
+    pendingIcon,
+    collIcon,
+    appCancelIcon,
+    appCompIcon,
+    userIcon,
+    clockIcon,
+    videoCallIcon,
+    audioCallIcon,
+    incomingIcon,
+    bellIcon,
+    callEndIcon,
+    micIcon,
+    muteMicIcon,
+    muteVideoIcon,
+    chattingIcon,
+    onlineIcon,
+    offlineIcon,
+    audioIcon,
+    videoIcon,
+    crossIcon,
+    waitingIcon,
+    readIcon,
+    sendIcon,
+    attachIcon,
+    sendMsgIcon,
     add_icon,
     admin_logo,
     appointment_icon,

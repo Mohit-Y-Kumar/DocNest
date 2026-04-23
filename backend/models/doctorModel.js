@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 
-// Define the schema
 const doctorSchema = new mongoose.Schema(
     {
         name: {
@@ -37,7 +36,6 @@ const doctorSchema = new mongoose.Schema(
 
 );
 
-// Create the model
 const doctorModel = mongoose.models.doctor || mongoose.model('doctor', doctorSchema);
 
 export default doctorModel;

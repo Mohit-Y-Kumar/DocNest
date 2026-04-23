@@ -1,18 +1,26 @@
-import mongoose from 'mongoose';
+import mongoose from 'mongoose'
 
-// MongoDB URI
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/mydatabase';
-
-// Connect to MongoDB
 const connectDB = async () => {
-  try {
-    await mongoose.connect(MONGO_URI, {
-     
-    });
-    console.log('✅ MongoDB connected successfully');
-  } catch (error) {
-    console.error('❌ MongoDB connection failed:', error.message);
-  }
-};
+    const uri = process.env.MONGO_URI
 
-export default connectDB;
+    if (!uri) {
+        console.error('[MongoDB] MONGO_URI is not defined in environment variables')
+        process.exit(1)
+    }
+
+    try {
+        mongoose.connection.on('connected',    () => console.log('[MongoDB] Connected'))
+        mongoose.connection.on('disconnected', () => console.warn('[MongoDB] Disconnected'))
+        mongoose.connection.on('error',        (err) => console.error('[MongoDB] Error:', err.message))
+
+        await mongoose.connect(uri, {
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000
+        })
+    } catch (error) {
+        console.error('[MongoDB] Connection failed:', error.message)
+        process.exit(1)
+    }
+}
+
+export default connectDB

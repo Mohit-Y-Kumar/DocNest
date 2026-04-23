@@ -2,6 +2,9 @@ import React, { useContext, useEffect, useState } from 'react'
 import { DoctorContext } from '../../context/DoctorContext'
 import { AppContext } from '../../context/AppContext'
 import { toast } from 'react-toastify'
+import { assets } from '../../assets/assets'
+import address from '../../assets/address.svg'
+import edit from '../../assets/edit.svg'
 import axios from 'axios'
 
 
@@ -62,51 +65,50 @@ const DoctorProfile = () => {
   }
   return profileData && (
 
-    <div className='ml-24 md:ml-64 p-4 sm:p-5 space-y-5 max-w-5xl mx-auto min-h-screen'>
+    <div className='m-5    space-y-5  min-h-screen'>
 
-      {/* ── Profile Card ── */}
+      {/*  Profile Card  */}
       <div className='bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden'>
 
         {/* Banner */}
-        <div className='h-10 sm:h-12 bg-gradient-to-r from-[#5F6FFF] to-[#8B94FF] relative'>
-          {/* decorative dots */}
+        <div className='h-6 sm:h-12 bg-gradient-to-r from-[#5F6FFF] to-[#8B94FF] relative'>
           <div className='absolute inset-0 opacity-10'
             style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }}
           />
         </div>
 
-        {/* Avatar + name row */}
-        <div className='px-4 sm:px-6 md:px-8 sm pb-6'>
-          <div className='flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-12 sm:-mt-14 mb-5'>
-            <div className='flex items-end gap-4 mt-16 sm:mt-20'>
+        {/* Avatar */}
+        <div className='px-4 py-14 sm:px-6 md:px-8 sm pb-6'>
+          <div className='flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-5'>
+            <div className='flex items-end gap-3 sm:gap-4 -mt-8 sm:-mt-10'>
               <img
-                className='w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl object-cover border-4 border-white shadow-md ring-2 ring-[#eef0ff]'
+                className='w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl object-cover border-4 border-white shadow-md ring-2 ring-[#eef0ff] flex-shrink-0'
                 src={profileData.image}
                 alt={profileData.name}
               />
-              <div className='mb-1'>
-                <h2 className='text-lg sm:text-xl md:text-2xl font-bold text-[#1A1F5E] leading-tight'>{profileData.name}</h2>
-                <p className='text-sm text-gray-500 mt-0.5'>{profileData.degree} · {profileData.speciality}</p>
-                <span className='inline-block mt-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#eef0ff] text-[#5F6FFF]'>
+              <div className='mb-1 min-w-0'>
+                <h2 className='text-base sm:text-xl md:text-2xl font-bold text-[#1A1F5E] leading-tight truncate'>{profileData.name}</h2>
+                <p className='text-xs sm:text-sm text-gray-500 mt-0.5 truncate'>{profileData.degree} · {profileData.speciality}</p>
+                <span className='inline-block mt-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#eef0ff] text-[#5F6FFF] whitespace-nowrap'>
                   {profileData.experience}
                 </span>
               </div>
             </div>
 
             {/* Edit / Save button */}
-            <div className='flex flex-col sm:flex-row gap-2 w-full sm:w-auto'>
+            <div className='flex flex-row gap-2 w-full sm:w-auto'>
               {isEdit ? (
                 <>
                   <button
                     onClick={() => setIsEdit(false)}
-                    className='px-4 py-2 text-sm rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 transition'
+                    className='flex-1 sm:flex-none px-4 py-2 text-sm rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 transition'
                   >
                     Cancel
                   </button>
                   <button
                     onClick={updateProfile}
                     disabled={saving}
-                    className='w-full sm:w-auto  px-5 py-2 text-sm rounded-full bg-[#5F6FFF] text-white font-semibold hover:bg-[#4a5aee] transition disabled:opacity-60'
+                    className='flex-1 sm:flex-none px-5 py-2 text-sm rounded-full bg-[#5F6FFF] text-white font-semibold hover:bg-[#4a5aee] transition disabled:opacity-60'
                   >
                     {saving ? 'Saving…' : 'Save Changes'}
                   </button>
@@ -114,9 +116,10 @@ const DoctorProfile = () => {
               ) : (
                 <button
                   onClick={() => setIsEdit(true)}
-                  className='px-5 py-2 text-sm rounded-full border-2 border-[#5F6FFF] text-[#5F6FFF] font-semibold hover:bg-[#5F6FFF] hover:text-white transition'
+                  className='w-full sm:w-auto px-5 py-2 text-sm rounded-full border-2 border-[#5F6FFF] text-[#5F6FFF] font-semibold hover:bg-[#5F6FFF] hover:text-white transition flex items-center justify-center gap-2'
                 >
-                  ✏️ Edit Profile
+                  <img src={edit} className='w-4 h-4' alt="edit" />
+                  Edit Profile
                 </button>
               )}
             </div>
@@ -128,17 +131,18 @@ const DoctorProfile = () => {
             <p className='text-sm text-gray-600 leading-relaxed max-w-2xl'>{profileData.about}</p>
           </div>
 
-          {/* Divider */}
+          
           <div className='border-t border-gray-100 my-5' />
 
           {/* Info Grid */}
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5'>
+
 
             {/* Consultation Fee */}
             <div>
               <p className='text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2'>Consultation Fee</p>
               <div className='flex items-center gap-2'>
-                <span className='w-8 h-8 rounded-lg bg-[#eef0ff] flex items-center justify-center text-sm'>💰</span>
+                <span className='w-8 h-8 rounded-lg bg-[#eef0ff] flex items-center justify-center text-sm'><img src={assets.earning_icon} alt="" /></span>
                 {isEdit ? (
                   <input
                     type='number'
@@ -180,7 +184,7 @@ const DoctorProfile = () => {
             <div>
               <p className='text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2'>Address Line 1</p>
               <div className='flex items-center gap-2'>
-                <span className='w-8 h-8 rounded-lg bg-[#eef0ff] flex items-center justify-center text-sm flex-shrink-0'>📍</span>
+                <span className='w-8 h-8 rounded-lg bg-[#eef0ff] flex items-center justify-center text-sm flex-shrink-0'><img className='bg-blue-300 rounded-sm' src={address} alt="" /></span>
                 {isEdit ? (
                   <input
                     type='text'
@@ -198,7 +202,7 @@ const DoctorProfile = () => {
             <div>
               <p className='text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2'>Address Line 2</p>
               <div className='flex items-center gap-2'>
-                <span className='w-8 h-8 rounded-lg bg-[#eef0ff] flex items-center justify-center text-sm flex-shrink-0'>🏢</span>
+                <span className='w-8 h-8 rounded-lg bg-[#eef0ff] flex items-center justify-center text-sm flex-shrink-0'><img className='bg-blue-300  rounded-sm' src={address} alt="" /></span>
                 {isEdit ? (
                   <input
                     type='text'

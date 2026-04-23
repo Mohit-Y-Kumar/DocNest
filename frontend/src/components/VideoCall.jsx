@@ -2,17 +2,23 @@ import React, { useEffect, useState, useRef, useContext } from 'react'
 import { io } from 'socket.io-client'
 import Peer from 'simple-peer'
 import { AppContext } from '../context/AppContext'
+import { assets } from '../assets/assets'
+import { toast } from 'react-toastify'
 
 const VideoCall = ({
+    socketRef: externalSocketRef,
     roomId,
-    callType = 'video',
+    callType = 'audio',
     isInitiator = false,
+    initialIncomingCall = null,   
     callerId,
     callerModel,
     receiverId,
     receiverModel,
     callerName = '',
     callerImage = '',
+    receiverName = '',
+    receiverImage = '',
     onClose
 }) => {
     const { backendUrl } = useContext(AppContext)
@@ -24,384 +30,397 @@ const VideoCall = ({
     const [error, setError] = useState(null)
     const [callStatus, setCallStatus] = useState('idle')
     const [duration, setDuration] = useState(0)
-    const [incomingCall, setIncomingCall] = useState(null)
+
+
+    // Incoming call popup — set immediately from prop (no event wait)
+    const [incomingCall, setIncomingCall] = useState(initialIncomingCall)
 
     const localVideoRef = useRef(null)
     const remoteVideoRef = useRef(null)
     const streamRef = useRef(null)
     const timerRef = useRef(null)
-    const socketRef = useRef(null)
+    const internalSocketRef = useRef(null)
     const peerRef = useRef(null)
     const pendingSignalsRef = useRef([])
+    const callInitiatedRef = useRef(false)
+    const roomJoinedRef = useRef(false)
 
-    // ✅ Socket connect
+    // Always use external socket if available
+    const getSocket = () => externalSocketRef?.current || internalSocketRef.current
+
+    // Show incoming popup immediately if prop is set
     useEffect(() => {
-        socketRef.current = io(backendUrl, {
-            transports: ['websocket', 'polling'],
-            extraHeaders: {
-                'ngrok-skip-browser-warning': 'true'
-            }
-        })
-
-        socketRef.current.on('connect', () => {
-            socketRef.current.emit('join-room', roomId)
-        })
-
-        socketRef.current.on('incoming-call', (data) => {
-            setIncomingCall(data)
+        if (initialIncomingCall && !isInitiator) {
+            setIncomingCall(initialIncomingCall)
             setCallStatus('ringing')
+        }
+    }, []) 
+
+    //  Socket — use external or create own
+    useEffect(() => {
+        if (externalSocketRef?.current) {
+            const sock = externalSocketRef.current
+            if (!roomJoinedRef.current && sock.connected) {
+                sock.emit('join-room', roomId)
+                roomJoinedRef.current = true
+                console.log('[VideoCall] Room ensure (external socket):', roomId)
+            }
+            return () => { }
+        }
+
+        // Fallback: own socket
+        const socket = io(backendUrl, {
+            transports: ['websocket', 'polling'],
+            extraHeaders: { 'ngrok-skip-browser-warning': 'true' }
+        })
+        internalSocketRef.current = socket
+
+        socket.on('connect', () => {
+            console.log('[VideoCall] Own socket connected:', socket.id)
+            if (!roomJoinedRef.current) {
+                socket.emit('join-room', roomId)
+                roomJoinedRef.current = true
+            }
         })
 
-        socketRef.current.on('call-accepted', () => {
-            setCallStatus('accepted')
-            if (peerRef.current) {
-                console.warn('Peer already exists — skip')
-                return
-            }
+        return () => { socket.disconnect() }
+    }, [backendUrl, roomId]) 
 
+    //  Socket event listeners
+    useEffect(() => {
+        const socket = getSocket()
+        if (!socket) return
+
+        const onCallAccepted = () => {
+            console.log('[VideoCall] call-accepted')
+            if (!isInitiator) return
+            if (peerRef.current) return
             if (!streamRef.current) return
-            // ✅ Initiator peer banao jab accept ho
+
             const peer = new Peer({
-                initiator: true,   // ✅ sirf caller initiator hai
+                initiator: true,
                 trickle: false,
                 stream: streamRef.current
             })
 
-            peer.on('signal', (signalData) => {
-                socketRef.current.emit('signal', { roomId, signalData })
-            })
+            peer.on('signal', sd => socket.emit('signal', { roomId, signalData: sd }))
 
-            peer.on('stream', (stream) => {
+            peer.on('stream', stream => {
                 setRemoteStream(stream)
+                setCallStatus('accepted')
             })
 
-            peer.on('error', (err) => {
-                console.error('Peer error:', err)
-                setError('Connection failed')
-            })
+            peer.on('error', () => setError('Connection failed.'))
 
             peerRef.current = peer
 
-            // ✅ Queue signals
             pendingSignalsRef.current.forEach(sig => {
-                try {
-                    peer.signal(sig)
-                } catch (err) {
-                    console.warn('Queued signal error:', err.message)
-                }
+                try { peer.signal(sig) } catch { }
             })
             pendingSignalsRef.current = []
+        }
 
-        })
+        const onCallRejected = () => {
+            console.log('[VideoCall] call-rejected')
 
-        socketRef.current.on('call-rejected', () => {
+            //  prevent duplicate toast
+            if (callStatus === 'rejected') return
+
             setCallStatus('rejected')
-            alert('Call reject ho gayi')
+            toast.error('Call rejected by Doctor')
             onClose()
-        })
+        }
 
-        socketRef.current.on('call-ended', () => {
-            endCall()
-        })
+        const onCallEnded = () => {
+            _cleanup(false)
+        }
 
-        socketRef.current.on('signal', ({ signalData }) => {
-            if (peerRef.current) {
-                try {
-                    if (!peerRef.current.destroyed) {
-                        peerRef.current.signal(signalData)
-                    }
-                } catch (err) {
-                    console.warn('Signal ignored:', err.message)
-                }
+        const onSignal = ({ signalData }) => {
+            if (peerRef.current && !peerRef.current.destroyed) {
+                try { peerRef.current.signal(signalData) } catch { }
             } else {
-                // ✅ Peer ready nahi — queue karo
                 pendingSignalsRef.current.push(signalData)
             }
-        })
+        }
+
+        //  remove old listeners before adding
+        socket.off('call-accepted', onCallAccepted)
+        socket.off('call-rejected', onCallRejected)
+        socket.off('call-ended', onCallEnded)
+        socket.off('signal', onSignal)
+
+        socket.on('call-accepted', onCallAccepted)
+        socket.on('call-rejected', onCallRejected)
+        socket.on('call-ended', onCallEnded)
+        socket.on('signal', onSignal)
 
         return () => {
-            socketRef.current.disconnect()
+            socket.off('call-accepted', onCallAccepted)
+            socket.off('call-rejected', onCallRejected)
+            socket.off('call-ended', onCallEnded)
+            socket.off('signal', onSignal)
         }
-    }, [backendUrl, roomId])
 
-    // ✅ Local video
+    }, [roomId, isInitiator])
+
+
+    //  Local media
     useEffect(() => {
-        const startLocalStream = async () => {
+        ; (async () => {
             try {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    setError('Camera/Mic supported nahi — HTTPS use karo ya localhost pe chalao')
+                if (!navigator.mediaDevices?.getUserMedia) {
+                    setError('Camera/mic not supported. Use HTTPS or localhost.')
                     return
                 }
-
-                let stream;
-
+                let stream
                 try {
-                    // ✅ Pehle video + audio try karo
                     stream = await navigator.mediaDevices.getUserMedia({
                         video: callType === 'video',
                         audio: true
                     })
-                } catch (err) {
-                    // ✅ Camera busy — sirf audio try karo
-                    console.warn('Camera busy — audio only')
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: false,
-                        audio: true
-                    })
+                } catch {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
                 }
-
                 setLocalStream(stream)
                 streamRef.current = stream
-
                 if (localVideoRef.current && stream.getVideoTracks().length > 0) {
                     localVideoRef.current.srcObject = stream
                 }
-
             } catch (err) {
-                if (err.name === 'NotAllowedError') {
-                    setError('Camera/Mic permission do')
-                } else if (err.name === 'NotFoundError') {
-                    setError('Camera/Mic nahi mila')
-                } else {
-                    setError(`Error: ${err.message}`)
-                }
+                if (err.name === 'NotAllowedError') setError('Please allow camera & microphone access.')
+                else if (err.name === 'NotFoundError') setError('Camera or microphone not found.')
+                else setError(`Media error: ${err.message}`)
             }
-        }
-        startLocalStream()
+        })()
+        return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
+    }, []) 
 
-        return () => {
-            streamRef.current?.getTracks().forEach(t => t.stop())
-            clearInterval(timerRef.current)
-        }
-    }, [])
-
-    // ✅ isInitiator — auto call shuru karo
+    // Auto-initiate (user → doctor)
     useEffect(() => {
-        if (isInitiator && localStream) {
-            initiateCall()
-        }
-    }, [isInitiator, localStream])
+        if (!isInitiator || !localStream || callInitiatedRef.current) return
+        callInitiatedRef.current = true
+        const t = setTimeout(_initiateCall, 800)
+        return () => clearTimeout(t)
+    }, [isInitiator, localStream]) 
 
-    // ✅ Remote video
+    //  Attach remote stream
     useEffect(() => {
         if (remoteStream && remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream
         }
     }, [remoteStream])
 
-    // ✅ Timer
+    //  Timer
     useEffect(() => {
         if (callStatus === 'accepted') {
-            timerRef.current = setInterval(() => {
-                setDuration(prev => prev + 1)
-            }, 1000)
+            timerRef.current = setInterval(() => setDuration(p => p + 1), 1000)
         } else {
             clearInterval(timerRef.current)
         }
         return () => clearInterval(timerRef.current)
     }, [callStatus])
 
-    const formatDuration = (seconds) => {
-        const m = Math.floor(seconds / 60).toString().padStart(2, '0')
-        const s = (seconds % 60).toString().padStart(2, '0')
-        return `${m}:${s}`
-    }
-
-    // ✅ Initiator peer — call accept hone ke baad
-    const createInitiatorPeer = () => {
-        if (!streamRef.current) return
-
-        const peer = new Peer({
-            initiator: true,
-            trickle: false,
-            stream: streamRef.current
-        })
-
-        peer.on('signal', (signalData) => {
-            socketRef.current.emit('signal', { roomId, signalData })
-        })
-
-        peer.on('stream', (stream) => {
-            setRemoteStream(stream)
-        })
-
-        peer.on('error', (err) => {
-            console.error('Peer error:', err)
-            setError('Connection failed')
-        })
-
-        peerRef.current = peer
-
-        // ✅ Queue signals
-        pendingSignalsRef.current.forEach(sig => peer.signal(sig))
-        pendingSignalsRef.current = []
-    }
-
-    // ✅ Call shuru karo — sirf call-user emit
-    const initiateCall = () => {
-        if (!streamRef.current) return
-        setCallStatus('ringing')
-
-        socketRef.current.emit('call-user', {
-            roomId,
-            callerId,
-            callerModel,
-            receiverId,
-            receiverModel,
-            callType,
-            callerName,
-            callerImage
-        })
-    }
-
-    // ✅ Accept call — receiver peer banao
-    const acceptCall = () => {
-        if (!streamRef.current) {
-            setError('Camera ready nahi hai')
-            return
+    // Helpers
+    const _initiateCall = () => {
+        const socket = getSocket()
+        if (!socket) { setError('Socket not ready.'); return }
+        if (!streamRef.current) { setError('Camera not ready.'); return }
+        if (!roomJoinedRef.current) {
+            socket.emit('join-room', roomId)
+            roomJoinedRef.current = true
         }
+        console.log('[VideoCall] Emitting call-user, room:', roomId)
+        setCallStatus('ringing')
+        socket.emit('call-user', {
+            roomId, callerId, callerModel,
+            receiverId, receiverModel,
+            callType, callerName, callerImage
+        })
+    }
+
+    const _cleanup = (emitEnded = true) => {
+        const socket = getSocket()
+        if (emitEnded && socket) socket.emit('call-ended', { roomId })
+        peerRef.current?.destroy()
+        peerRef.current = null
+        streamRef.current?.getTracks().forEach(t => t.stop())
+        clearInterval(timerRef.current)
+        setCallStatus('ended')
+        setDuration(0)
+        onClose()
+    }
+
+    const fmt = s => {
+        const m = Math.floor(s / 60).toString().padStart(2, '0')
+        const sec = (s % 60).toString().padStart(2, '0')
+        return `${m}:${sec}`
+    }
+
+    // Actions
+    const acceptCall = () => {
+        const socket = getSocket()
+        if (!streamRef.current) { setError('Camera not ready.'); return }
+        if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null }
 
         setIncomingCall(null)
-        setCallStatus('accepted')
+        setCallStatus('connecting')
 
-        socketRef.current.emit('call-accepted', { roomId })
+        if (!roomJoinedRef.current) {
+            socket.emit('join-room', roomId)
+            roomJoinedRef.current = true
+        }
+        socket.emit('call-accepted', { roomId })
+        console.log('[VideoCall] Accepted — creating RECEIVER peer')
 
-        const peer = new Peer({
-            initiator: false,
-            trickle: false,
-            stream: streamRef.current
-        })
+        const peer = new Peer({ initiator: false, trickle: false, stream: streamRef.current })
 
-        peer.on('signal', (signalData) => {
-            socketRef.current.emit('signal', { roomId, signalData })
-        })
-
-        peer.on('stream', (stream) => {
+        peer.on('signal', sd => socket.emit('signal', { roomId, signalData: sd }))
+        peer.on('stream', stream => {
+            console.log('[VideoCall] Remote stream (receiver)')
             setRemoteStream(stream)
+            setCallStatus('accepted')
         })
-
-        peer.on('error', (err) => {
-            console.error('Peer error:', err)
-            setError('Connection failed')
+        peer.on('error', err => {
+            console.error('[VideoCall] Peer error (receiver):', err)
+            setError('Connection failed.')
         })
 
         peerRef.current = peer
-
-        // ✅ Queue signals
-        pendingSignalsRef.current.forEach(sig => peer.signal(sig))
+        pendingSignalsRef.current.forEach(sig => {
+            try { if (!peer.destroyed) peer.signal(sig) } catch (e) { }
+        })
         pendingSignalsRef.current = []
     }
 
     const rejectCall = () => {
+        const socket = getSocket()
         setIncomingCall(null)
-        socketRef.current.emit('call-rejected', { roomId })
+        if (socket) socket.emit('call-rejected', { roomId })
         setCallStatus('idle')
         onClose()
     }
 
-    const endCall = () => {
-        peerRef.current?.destroy()
-        streamRef.current?.getTracks().forEach(t => t.stop())
-        if (socketRef.current) {
-            socketRef.current.emit('call-ended', { roomId })
-        }
-        clearInterval(timerRef.current)
-        setCallStatus('ended')
-        onClose()
-    }
-
+    const endCall = () => _cleanup(true)
     const toggleMute = () => {
         localStream?.getAudioTracks().forEach(t => { t.enabled = !t.enabled })
-        setIsMuted(prev => !prev)
+        setIsMuted(p => !p)
     }
-
     const toggleVideo = () => {
         localStream?.getVideoTracks().forEach(t => { t.enabled = !t.enabled })
-        setIsVideoOff(prev => !prev)
+        setIsVideoOff(p => !p)
     }
 
     return (
-        <div className='w-full h-full bg-black flex flex-col'>
+        <div className='w-full h-full bg-black flex flex-col relative overflow-hidden'>
 
+            {/* Error */}
             {error && (
-                <div className='absolute top-4 left-0 right-0 flex justify-center z-10'>
-                    <p className='bg-red-500 text-white px-4 py-2 rounded-full text-sm'>{error}</p>
+                <div className='absolute top-4 inset-x-0 flex justify-center z-20 px-4'>
+                    <p className='bg-red-500 text-white px-4 py-2 rounded-full text-sm shadow-lg'>{error}</p>
                 </div>
             )}
 
+            {/* Timer */}
             {callStatus === 'accepted' && (
-                <div className='absolute top-4 left-0 right-0 flex justify-center z-10'>
-                    <p className='bg-black/50 text-white px-4 py-1 rounded-full text-sm'>
-                        ⏱️ {formatDuration(duration)}
-                    </p>
+                <div className='absolute top-4 inset-x-0 flex justify-center z-20'>
+                    <div className=' backdrop-blur text-white px-4 py-1 rounded-full text-sm flex items-center gap-2'>
+                        <img src={assets.clockIcon} className='h-4 w-4 shrink-0' alt='' />
+                        <span className='tabular-nums'>{fmt(duration)}</span>
+                    </div>
                 </div>
             )}
 
+            {/* Remote video / waiting screen */}
             <div className='flex-1 relative bg-gray-900'>
                 {remoteStream ? (
                     <video ref={remoteVideoRef} autoPlay playsInline className='w-full h-full object-cover' />
                 ) : (
-                    <div className='w-full h-full flex flex-col items-center justify-center bg-gray-800'>
-                        <div className='w-24 h-24 rounded-full bg-gray-600 flex items-center justify-center text-4xl mb-3'>👤</div>
-                        <p className='text-white text-sm'>
-                            {callStatus === 'idle' && '⏳ Wait karo...'}
-                            {callStatus === 'ringing' && '🔔 Ringing...'}
-                            {callStatus === 'ended' && '📵 Call Ended'}
+                    <div className='w-full h-full flex flex-col items-center justify-center bg-gray-800 gap-3'>
+                        <div className='w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gray-600 overflow-hidden flex items-center justify-center'>
+                            {receiverImage
+                                ? <img src={receiverImage} className='w-full h-full object-cover'
+                                    onError={e => { e.target.onerror = null; e.target.style.display = 'none' }} />
+                                : <img src={assets.docIcon} className='w-12 h-12 opacity-60' alt='' />
+                            }
+                        </div>
+                        <p className='text-white font-medium text-sm'>{receiverName}</p>
+                        <p className='text-gray-400 text-sm'>
+                            {callStatus === 'idle' && 'Connecting…'}
+                            {callStatus === 'ringing' && 'Ringing…'}
+                            {callStatus === 'connecting' && 'Connecting…'}
+                            {callStatus === 'ended' && 'Call Ended'}
                         </p>
                     </div>
                 )}
 
-                <div className='absolute bottom-4 right-4 w-32 h-44 rounded-xl overflow-hidden border-2 border-white shadow-lg'>
-                    {!isVideoOff ? (
-                        <video ref={localVideoRef} autoPlay muted playsInline className='w-full h-full object-cover' />
-                    ) : (
-                        <div className='w-full h-full bg-gray-700 flex items-center justify-center text-2xl'>👤</div>
-                    )}
+                {/*  local preview */}
+                <div className='absolute bottom-4 right-4 w-24 h-32 sm:w-28 sm:h-40 rounded-2xl overflow-hidden border-2 border-white shadow-xl z-10'>
+                    {!isVideoOff
+                        ? <video ref={localVideoRef} autoPlay muted playsInline className='w-full h-full object-cover' />
+                        : <div className='w-full h-full bg-gray-700 flex items-center justify-center'>
+                            <img src={assets.userIcon} className='h-10 w-10 opacity-50' alt='' />
+                        </div>
+                    }
                 </div>
             </div>
 
-            <div className='bg-black/80 py-6 flex items-center justify-center gap-6'>
-                <button
-                    onClick={toggleMute}
-                    className={`w-14 h-14 rounded-full flex items-center justify-center text-xl transition
-                        ${isMuted ? 'bg-red-500' : 'bg-gray-600 hover:bg-gray-500'}`}
-                >
-                    {isMuted ? '🔇' : '🎙️'}
+            {/* Controls */}
+            <div className='bg-black/90 py-5 flex items-center justify-center gap-5 shrink-0'>
+                <button onClick={toggleMute}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors
+                        ${isMuted ? 'bg-red-500' : 'bg-white/10 hover:bg-white/20'}`}>
+                    <img src={isMuted ? assets.muteMicIcon : assets.micIcon} className='w-6 h-6' alt='mic' />
                 </button>
-
                 {callType === 'video' && (
-                    <button
-                        onClick={toggleVideo}
-                        className={`w-14 h-14 rounded-full flex items-center justify-center text-xl transition
-                            ${isVideoOff ? 'bg-red-500' : 'bg-gray-600 hover:bg-gray-500'}`}
-                    >
-                        {isVideoOff ? '📷' : '📹'}
+                    <button onClick={toggleVideo}
+                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors
+                            ${isVideoOff ? 'bg-red-500' : 'bg-white/10 hover:bg-white/20'}`}>
+                        <img src={isVideoOff ? assets.muteVideoIcon : assets.videoIcon} className='w-6 h-6' alt='video' />
                     </button>
                 )}
-
-                <button
-                    onClick={endCall}
-                    className='w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-xl'
-                >
-                    📵
+                <button onClick={endCall}
+                    className='w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition-colors'>
+                    <img src={assets.callEndIcon} className='w-7 h-7' alt='end' />
                 </button>
             </div>
 
-            {/* Incoming Call Popup */}
-            {incomingCall && (
-                <div className='fixed inset-0 bg-black/70 z-50 flex items-center justify-center'>
-                    <div className='bg-white rounded-2xl p-6 w-72 flex flex-col items-center gap-4'>
-                        {incomingCall?.callerImage
-                            ? <img src={incomingCall.callerImage} className='w-20 h-20 rounded-full object-cover' />
-                            : <div className='w-20 h-20 rounded-full bg-gray-300 flex items-center justify-center text-3xl'>👤</div>
-                        }
-                        <p className='text-gray-800 font-semibold text-lg'>{incomingCall?.callerName}</p>
-                        <p className='text-gray-500 text-sm'>
-                            {incomingCall?.callType === 'video' ? '📹 Video Call' : '📞 Audio Call'}
-                        </p>
-                        <div className='flex gap-6 mt-2'>
-                            <button onClick={acceptCall} className='w-14 h-14 rounded-full bg-green-500 flex items-center justify-center text-2xl'>✅</button>
-                            <button onClick={rejectCall} className='w-14 h-14 rounded-full bg-red-500 flex items-center justify-center text-2xl'>❌</button>
+            {/* Incoming Call Popup doctor → user */}
+            {incomingCall && callStatus !== 'accepted' && (
+                <div className='fixed inset-0 bg-black/75 z-50 flex items-center justify-center px-4'>
+                    <div className='bg-white rounded-3xl p-6 w-full max-w-xs flex flex-col items-center gap-4 shadow-2xl'>
+
+                        <div className='w-20 h-20 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center'>
+                            {incomingCall.callerImage
+                                ? <img src={incomingCall.callerImage} className='w-full h-full object-cover' alt='' />
+                                : <img src={assets.docIcon} className='w-12 h-12 opacity-60' alt='' />
+                            }
+                        </div>
+
+                        <div className='text-center'>
+                            <p className='text-gray-900 font-semibold text-lg'>
+                                {incomingCall.callerName || 'Doctor'}
+                            </p>
+                            <p className='text-gray-400 text-sm mt-0.5'>
+                                Incoming {incomingCall.callType === 'video' ? 'Video' : 'Audio'} Call
+                            </p>
+                        </div>
+
+                        <div className='flex gap-10 mt-1'>
+                            <div className='flex flex-col items-center gap-1'>
+                                <button onClick={rejectCall}
+                                    className='w-14 h-14 rounded-full bg-red-200 hover:bg-red-400 flex items-center justify-center shadow-lg transition-colors'>
+                                    <img src={assets.callEndIcon} className='w-7 h-7' alt='decline' />
+                                </button>
+                                <span className='text-xs text-gray-400'>Decline</span>
+                            </div>
+                            <div className='flex flex-col items-center gap-1'>
+                                <button onClick={acceptCall}
+                                    className='w-14 h-14 rounded-full bg-green-200 hover:bg-green-400 flex items-center justify-center shadow-lg transition-colors'>
+                                    <img src={incomingCall.callType === 'video' ? assets.videoIcon : assets.micIcon}
+                                        className='w-7 h-7' alt='accept' />
+                                </button>
+                                <span className='text-xs text-gray-400'>Accept</span>
+                            </div>
                         </div>
                     </div>
                 </div>

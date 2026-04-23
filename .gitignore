@@ -1,6 +1,25 @@
-.env
-.env.*
-admin/.env
-backend/.env
-frontend/.env
+# Dependencies
 node_modules/
+**/node_modules/
+
+.env
+**/.env
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Uploaded files 
+uploads/

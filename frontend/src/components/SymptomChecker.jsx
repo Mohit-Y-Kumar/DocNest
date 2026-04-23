@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { AppContext } from '../context/AppContext'
 import axios from 'axios'
 
+import { assets } from '../assets/assets'
+
 const SymptomChecker = () => {
     const { backendUrl, doctors } = useContext(AppContext)
     const navigate = useNavigate()
@@ -13,14 +15,15 @@ const SymptomChecker = () => {
     const [suggestedDoctors, setSuggestedDoctors] = useState([])
     const [searched, setSearched] = useState(false)
 
+
+
     // Quick symptom buttons
     const quickSymptoms = [
-        { label: '🤒 Fever',     text: 'Mujhe bukhar hai' },
-        { label: '🤕 Headache',  text: 'Mujhe sir dard hai' },
-        { label: '🤢 Stomach',   text: 'Mujhe pet dard hai' },
-        { label: '🧴 Skin',      text: 'Mujhe skin problem hai' },
-        { label: '🧒 Child',     text: 'Mere bachhe ko bukhar hai' },
-        { label: '🌸 Women',     text: 'Mujhe fever problem hai' },
+        { label: 'Fever', text: 'I have a fever', icon: assets.feverIcon },
+        { label: 'Headache', text: 'I have a headache', icon: assets.headacheIcon },
+        { label: 'Stomach', text: 'I have stomach pain', icon: assets.stomachIcon },
+        { label: 'Skin', text: 'I have a skin problem', icon: assets.skinIcon },
+        { label: 'Child', text: 'My child has a fever', icon: assets.childIcon },
     ]
 
     const findDoctor = async (directSymptom = null) => {
@@ -42,13 +45,13 @@ const SymptomChecker = () => {
                 let reply = data.reply
                 let speciality = null
 
-                // SPECIALITY tag detect karo
+                // SPECIALITY tag detect 
                 if (reply.includes('SPECIALITY:')) {
                     const parts = reply.split('SPECIALITY:')
                     reply = parts[0].trim()
                     speciality = parts[1].trim()
 
-                    // Doctors filter karo
+                    // Doctors filter 
                     const filtered = doctors?.filter(
                         doc => doc.speciality === speciality
                     )
@@ -58,7 +61,7 @@ const SymptomChecker = () => {
                 setAiReply(reply)
             }
         } catch (error) {
-            setAiReply('Kuch error aa gaya. Dobara try karo.')
+            setAiReply('Something went wrong. Please try again.')
         } finally {
             setLoading(false)
         }
@@ -69,11 +72,13 @@ const SymptomChecker = () => {
 
             {/* Heading */}
             <div className='text-center mb-8'>
-                <h2 className='text-3xl md:text-4xl font-semibold text-gray-900'>
-                    🔍 Symptom Checker
+                <h2 className='flex items-center justify-center gap-2 text-3xl md:text-4xl font-semibold text-gray-900'>
+                    <img src={assets.lenseIcon} alt="search" className="w-14 h-14" />
+                    <span>Symptom Checker</span>
                 </h2>
+
                 <p className='text-gray-500 text-sm mt-2'>
-                    Apne symptoms batao — hum sahi doctor suggest karenge
+                    Enter your symptoms — we’ll suggest the most suitable doctor for you.
                 </p>
             </div>
 
@@ -85,15 +90,23 @@ const SymptomChecker = () => {
                         value={symptom}
                         onChange={(e) => setSymptom(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && findDoctor()}
-                        placeholder='Apne symptoms likho... (e.g. sir dard, bukhar, pet dard)'
+                        placeholder="Enter your symptoms (e.g., headache, fever, stomach pain)"
                         className='flex-1 border border-gray-300 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-indigo-400 shadow-sm'
                     />
                     <button
                         onClick={() => findDoctor()}
                         disabled={loading || !symptom.trim()}
-                        className='bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full text-sm font-medium disabled:opacity-50 hover:scale-105 transition-all duration-300'
+                        className='flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full text-sm font-medium disabled:opacity-50 hover:scale-105 transition-all duration-300'
                     >
-                        {loading ? '⏳' : '🔍 Find'}
+                        <img
+                            src={loading ? assets.loadingIcon : assets.lenseIcon}
+                            alt="icon"
+                            className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`}
+                        />
+
+                        <span>
+                            {loading ? 'Finding doctors...' : 'Find Doctor'}
+                        </span>
                     </button>
                 </div>
 
@@ -106,9 +119,10 @@ const SymptomChecker = () => {
                                 setSymptom(s.text)
                                 findDoctor(s.text)
                             }}
-                            className='text-xs bg-indigo-50 border border-indigo-200 text-indigo-600 px-4 py-2 rounded-full hover:bg-indigo-100 transition'
+                            className='flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 text-indigo-600 px-4 py-2 rounded-full hover:bg-indigo-100 transition'
                         >
-                            {s.label}
+                            <img src={s.icon} alt={s.label} className="w-4 h-4" />
+                            <span>{s.label}</span>
                         </button>
                     ))}
                 </div>
@@ -122,14 +136,17 @@ const SymptomChecker = () => {
                         <span className='w-3 h-3 bg-indigo-400 rounded-full animate-bounce' style={{ animationDelay: '150ms' }}></span>
                         <span className='w-3 h-3 bg-indigo-400 rounded-full animate-bounce' style={{ animationDelay: '300ms' }}></span>
                     </div>
-                    <p className='text-sm text-gray-400 mt-2'>AI analyze kar raha hai...</p>
+                    <p className='text-sm text-gray-400 mt-2'>Analyzing your symptoms to find the best doctor...</p>
                 </div>
             )}
 
             {/* AI Reply */}
             {aiReply && !loading && (
                 <div className='max-w-2xl mx-auto mt-6 bg-indigo-50 border border-indigo-100 rounded-2xl p-4'>
-                    <p className='text-sm font-medium text-indigo-700 mb-1'>🤖 AI Suggestion:</p>
+                    <p className='flex items-center gap-2 text-sm font-medium text-indigo-700 mb-1'>
+                        <img src={assets.robotIcon} alt="AI" className="w-4 h-4" />
+                        <span>AI Suggestion:</span>
+                    </p>
                     <p className='text-sm text-gray-700 whitespace-pre-line'>{aiReply}</p>
                 </div>
             )}
@@ -137,8 +154,9 @@ const SymptomChecker = () => {
             {/* Suggested Doctors */}
             {suggestedDoctors.length > 0 && !loading && (
                 <div className='mt-8'>
-                    <h3 className='text-xl font-semibold text-center text-gray-800 mb-4'>
-                        👨‍⚕️ Recommended Doctors
+                    <h3 className='flex items-center justify-center gap-2 text-xl font-semibold text-gray-800 mb-4'>
+                        <img src={assets.docIcon} alt="doctor" className="w-10 h-10" />
+                        <span>AI Recommendation</span>
                     </h3>
                     <div className='grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))] px-4 md:px-10'>
                         {suggestedDoctors.map((doc, index) => (
@@ -160,7 +178,9 @@ const SymptomChecker = () => {
                                     <div className='flex items-center justify-between mt-1'>
                                         <p className='font-medium text-gray-900 text-sm'>{doc.name}</p>
                                         <div className='flex items-center gap-1'>
-                                            <span className='text-yellow-400 text-xs'>⭐</span>
+                                            <span className='text-yellow-400 text-xs'>
+                                                <img src={assets.filledStar} alt="star" className="w-4 h-4 inline" />
+                                            </span>
                                             <span className='text-xs text-gray-500'>{doc.averageRating || '0.0'}</span>
                                         </div>
                                     </div>
@@ -182,12 +202,12 @@ const SymptomChecker = () => {
             {searched && !loading && suggestedDoctors.length === 0 && aiReply && (
                 <div className='text-center mt-4'>
                     <p className='text-gray-500 text-sm'>
-                        Koi specific doctor nahi mila —
+                        No exact match found — 
                         <span
                             onClick={() => navigate('/doctors')}
                             className='text-indigo-600 cursor-pointer ml-1 underline'
                         >
-                            Saare doctors dekho
+                            View All Doctors
                         </span>
                     </p>
                 </div>

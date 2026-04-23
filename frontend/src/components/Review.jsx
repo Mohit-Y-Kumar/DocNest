@@ -4,6 +4,7 @@ import { AppContext } from "../context/AppContext";
 import axios from "axios";
 import { toast } from "react-toastify";
 
+
 const Review = ({
   canReview = false,
   readOnly = false,
@@ -17,18 +18,17 @@ const Review = ({
 
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
-  const [reviewId, setReviewId] = useState(null);  // step 1 ke baad milega
-  const [step, setStep] = useState("rating");       // "rating" | "comment" | "done"
+  const [reviewId, setReviewId] = useState(null);
+  const [step, setStep] = useState("rating");
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editRating, setEditRating] = useState(0);
   const [editComment, setEditComment] = useState('');
   const [currentReviewId, setCurrentReviewId] = useState(null);
 
-  // ⭐ Step 1 — Rating submit
   const handleRatingSubmit = async () => {
     if (rating === 0) {
-      toast.error("Pehle star select karo");
+      toast.error("Please select a rating first");
       return;
     }
 
@@ -41,8 +41,9 @@ const Review = ({
       );
 
       if (data.success) {
-        setReviewId(data.reviewId);  // step 2 ke liye save karo
-        setStep("comment");          // comment step pe jao
+        setReviewId(data.reviewId);
+        setReviewText("");
+        setStep("comment");
         toast.success(data.message);
       } else {
         toast.error(data.message);
@@ -54,10 +55,10 @@ const Review = ({
     }
   };
 
-  // ✍️ Step 2 — Comment submit
+  //  — Comment submit
   const handleCommentSubmit = async () => {
     if (!reviewText.trim()) {
-      toast.error("Review likhna zaroori hai");
+      toast.error("Please write a review before submitting");
       return;
     }
 
@@ -71,7 +72,7 @@ const Review = ({
 
       if (data.success) {
         setStep("done");
-        toast.success("Review submit ho gaya! ✅");
+        toast.success("Review submitted successfully!")
         if (onReviewSubmit) onReviewSubmit();
       } else {
         toast.error(data.message);
@@ -83,7 +84,7 @@ const Review = ({
     }
   };
 
-  // ✏️ Edit karo
+  //  Edit 
   const handleEditSubmit = async () => {
     try {
       setLoading(true);
@@ -93,9 +94,9 @@ const Review = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (data.success) {
-        toast.success('Review update ho gaya!');
+        toast.success("Review updated successfully!");
         setIsEditing(false);
-        if (onReviewSubmit) onReviewSubmit();  // refresh
+        if (onReviewSubmit) onReviewSubmit();
       } else {
         toast.error(data.message);
       }
@@ -106,7 +107,7 @@ const Review = ({
     }
   };
 
-  // 🗑️ Delete karo
+  //  Delete 
   const handleDelete = async (reviewId) => {
     try {
       const { data } = await axios.delete(
@@ -114,8 +115,8 @@ const Review = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (data.success) {
-        toast.success('Review delete ho gaya!');
-        if (onReviewSubmit) onReviewSubmit();  // refresh
+        toast.success("Review deleted successfully!")
+        if (onReviewSubmit) onReviewSubmit();
       } else {
         toast.error(data.message);
       }
@@ -127,15 +128,13 @@ const Review = ({
   return (
     <div className="mt-6 p-4 border rounded-lg bg-gray-50">
 
-      {/* ===================== */}
       {/* EDITABLE REVIEW SECTION */}
-      {/* ===================== */}
       {canReview && !readOnly && (
         <>
-          {/* ⭐ Step 1 — Rating */}
+          {/*  Rating */}
           {step === "rating" && (
             <>
-              <h2 className="text-lg font-semibold mb-2">Rate your experience</h2>
+              <h2 className="text-lg font-semibold mb-2">How would you rate your experience?</h2>
               <div className="flex gap-1 mb-3">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <img
@@ -157,12 +156,12 @@ const Review = ({
             </>
           )}
 
-          {/* ✍️ Step 2 — Comment */}
+          {/*  Comment */}
           {step === "comment" && (
             <>
-              <h2 className="text-lg font-semibold mb-2">Write your review</h2>
+              <h2 className="text-lg font-semibold mb-2">Share your experience</h2>
 
-              {/* Selected stars dikhao */}
+              {/*show selected stars */}
               <div className="flex gap-1 mb-3">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <img
@@ -193,25 +192,22 @@ const Review = ({
                   onClick={() => setStep("done")}
                   className="border px-6 py-2 rounded-full text-gray-500"
                 >
-                  Skip
+                  Skip for now
                 </button>
               </div>
             </>
           )}
 
-          {/* ✅ Done */}
           {step === "done" && (
             <div className="text-center py-4">
-              <p className="text-green-600 text-lg font-semibold">✅ Review submitted!</p>
-              <p className="text-gray-500 text-sm mt-1">Shukriya! Tumhara review submit ho gaya.</p>
+              <p className="text-green-600 text-lg font-semibold"> Review submitted successfully</p>
+              <p className="text-gray-500 text-sm mt-1">Thank you! Your review has been submitted successfully.</p>
             </div>
           )}
         </>
       )}
 
-      {/* ===================== */}
-      {/* PUBLIC READ-ONLY SECTION */}
-      {/* ===================== */}
+      {/* PUBLIC  */}
       {readOnly && (
         <div>
           <h2 className="text-lg font-semibold mb-3">Patient Reviews</h2>
@@ -259,7 +255,6 @@ const Review = ({
             </div>
           )}
 
-          {/* Reviews List */}
           {/* Reviews List */}
           {reviewData.length > 0 ? (
             reviewData.map((review, index) => (
@@ -312,7 +307,12 @@ const Review = ({
                         {loading ? 'Saving...' : 'Save'}
                       </button>
                       <button
-                        onClick={() => setIsEditing(false)}
+                        onClick={() => {
+                          setIsEditing(false)
+                          setCurrentReviewId(null)
+                          setEditRating(0)
+                          setEditComment('')
+                        }}
                         className="border px-4 py-1 rounded-full text-sm text-gray-500"
                       >
                         Cancel
@@ -338,7 +338,7 @@ const Review = ({
                       <p className="text-gray-700 text-sm">{review.comment}</p>
                     )}
 
-                    {/* ✅ Edit & Delete — sirf apni review pe dikhao */}
+                    {/*  Edit & Delete — only own review*/}
                     {token && review.patient?._id === userData?._id && (
                       <div className="flex gap-2 mt-2">
                         <button
@@ -348,15 +348,21 @@ const Review = ({
                             setEditRating(review.rating);
                             setEditComment(review.comment);
                           }}
-                          className="text-xs text-indigo-600 border border-indigo-300 px-3 py-1 rounded-full hover:bg-indigo-50"
+                          className="flex items-center gap-1 text-xs text-indigo-600 border border-indigo-300 px-3 py-1 rounded-full hover:bg-indigo-50 transition"
                         >
-                          ✏️ Edit
+                          <img src={assets.editIcon} alt="edit" className="w-3.5 h-3.5" />
+                          <span>Edit</span>
                         </button>
                         <button
                           onClick={() => handleDelete(review._id)}
-                          className="text-xs text-red-500 border border-red-300 px-3 py-1 rounded-full hover:bg-red-50"
+                          className="flex items-center gap-1 text-xs text-red-500 border border-red-300 px-3 py-1 rounded-full hover:bg-red-50 transition"
                         >
-                          🗑️ Delete
+                          <img
+                            src={assets.trashIcon}
+                            alt="delete"
+                            className="w-3.5 h-3.5 "
+                          />
+                          <span>Delete</span>
                         </button>
                       </div>
                     )}
@@ -365,7 +371,7 @@ const Review = ({
               </div>
             ))
           ) : (
-            <p className="text-gray-500">No reviews yet</p>
+            <p className="text-gray-500"> No patient reviews available yet.</p>
           )}
         </div>
       )}

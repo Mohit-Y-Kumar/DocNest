@@ -1,33 +1,25 @@
-import jwt from 'jsonwebtoken';
-import doctorModel from '../models/doctorModel.js'; // optional, if you want to fetch admin details
+import jwt from 'jsonwebtoken'
 
-// Middleware to verify JWT token for admin routes
-const authAdmin = async (req, res, next) => {
+const authAdmin = (req, res, next) => {
     try {
-        // 1️⃣ Get token from headers
-        const authHeader = req.headers.authorization;
+        const authHeader = req.headers.authorization
 
-        if (!authHeader) {
-            return res.status(401).json({ success: false, message: "Not authorized: Token missing" });
-        }
-        const atoken = authHeader.split(" ")[1];
-        if (!atoken) {
-            return res.status(401).json({ success: false, message: "Invalid token format" });
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, message: 'Not authorized: Token missing' })
         }
 
-        // 2️⃣ Verify token
-        const token_decoded = jwt.verify(atoken, process.env.JWT_SECRET);
+        const token = authHeader.split(' ')[1]
+        const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
-        if (token_decoded !== process.env.ADMIN_EMAIL + process.env.ADMIN_PASSWORD) {
-            return res.status(401).json({ success: false, message: 'not authorized Login again' });
-
+        // Admin token payload must contain role: 'admin'
+        if (decoded.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Forbidden: Admin access only' })
         }
 
-        next(); // pass control to next middleware/route
+        next()
     } catch (error) {
-        console.error(' Admin auth error:', error);
-        return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+        return res.status(401).json({ success: false, message: 'Invalid or expired token' })
     }
-};
+}
 
-export default authAdmin;
+export default authAdmin
