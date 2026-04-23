@@ -5,6 +5,7 @@ pipeline {
         DOCKERHUB_CREDS = 'dockerhub-creds'
         DOCKER_USER = 'mohityadv'
         NETWORK = "docnest-network"
+        SERVER_IP = "192.168.56.10"
     }
 
     stages {
@@ -27,13 +28,13 @@ pipeline {
 
                     sh """
                     docker build \
-                    --build-arg VITE_BACKEND_URL=http://localhost:4000 \
+                   --build-arg VITE_BACKEND_URL=http://${SERVER_IP}:4000 \
                     -t ${FRONTEND_IMAGE} ./frontend
                     """
 
                     sh """
                     docker build \
-                    --build-arg VITE_BACKEND_URL=http://localhost:4000 \
+                    --build-arg VITE_BACKEND_URL=http://${SERVER_IP}:4000 \
                     -t ${ADMIN_IMAGE} ./admin
                     """
                 }
