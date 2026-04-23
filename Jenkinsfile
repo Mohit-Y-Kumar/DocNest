@@ -27,13 +27,13 @@ pipeline {
 
                     sh """
                     docker build \
-                    --build-arg VITE_BACKEND_URL=http://backend:4000 \
+                    --build-arg VITE_BACKEND_URL=http://localhost:4000 \
                     -t ${FRONTEND_IMAGE} ./frontend
                     """
 
                     sh """
                     docker build \
-                    --build-arg VITE_BACKEND_URL=http://backend:4000 \
+                    --build-arg VITE_BACKEND_URL=http://localhost:4000 \
                     -t ${ADMIN_IMAGE} ./admin
                     """
                 }
