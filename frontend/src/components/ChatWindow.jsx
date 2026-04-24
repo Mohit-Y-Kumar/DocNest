@@ -8,7 +8,7 @@ import { assets } from '../assets/assets'
 
 
 const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose }) => {
-    const { backendUrl, userData } = useContext(AppContext)
+    const { backendUrl, userData,token } = useContext(AppContext)
 
     const [messages, setMessages] = useState([])
     const [input, setInput] = useState('')
@@ -102,9 +102,9 @@ const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose 
     useEffect(() => {
         const loadHistory = async () => {
             try {
-                const { data } = await axios.get(backendUrl + `/api/chat/history/${chatRoomId}`)
+                const { data } = await axios.get(backendUrl + `/api/chat/history/${chatRoomId}`, { headers: { Authorization: `Bearer ${token}` } })
                 if (data.success) setMessages(data.messages)
-                await axios.put(backendUrl + `/api/chat/mark-read/${chatRoomId}`, { readBy: userData?._id })
+                await axios.put(backendUrl + `/api/chat/mark-read/${chatRoomId}`, { readBy: userData?._id }, { headers: { Authorization: `Bearer ${token}` } })
             } catch (err) { console.log(err) }
         }
         loadHistory()
@@ -128,7 +128,7 @@ const ChatWindow = ({ appointmentId, doctorId, doctorName, doctorImage, onClose 
             formData.append('name', userData?.name)
             try {
                 const { data } = await axios.post(backendUrl + '/api/chat/upload-image', formData,
-                    { headers: { 'Content-Type': 'multipart/form-data' } })
+                    { headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` } })
                 if (data.success) {
                     socketRef.current.emit('send-message', {
                         roomId: chatRoomId, message: '', imageUrl: data.message.imageUrl,
