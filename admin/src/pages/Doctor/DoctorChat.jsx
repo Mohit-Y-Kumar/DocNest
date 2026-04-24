@@ -7,7 +7,7 @@ import { assets } from '../../assets/assets'
 
 
 const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) => {
-    const { backendUrl, profileData } = useContext(DoctorContext)
+    const { backendUrl, profileData, dToken } = useContext(DoctorContext)
 
     const [messages, setMessages] = useState([])
     const [input, setInput] = useState('')
@@ -63,7 +63,7 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
         //  Incoming call 
         socketRef.current.on('incoming-call', (data) => {
             console.log('[DoctorChat] incoming-call:', data)
-            if (data.callerId === docId) return  
+            if (data.callerId === docId) return
 
             // join Call room 
             socketRef.current.emit('join-room', data.roomId)
@@ -84,13 +84,17 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
         const loadHistory = async () => {
             try {
                 const res = await fetch(`${backendUrl}/api/chat/history/${roomId}`, {
-                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true',
+                        'Authorization': `Bearer ${dToken}`
+                    }
                 })
                 const data = await res.json()
                 if (data.success) setMessages(data.messages)
                 await axios.put(
                     backendUrl + `/api/chat/mark-read/${roomId}`,
-                    { readBy: docId }
+                    { readBy: docId },
+                    { headers: { Authorization: `Bearer ${dToken}` } }
                 )
             } catch (err) {
                 console.log(err)
@@ -118,7 +122,7 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
                 const { data } = await axios.post(
                     backendUrl + '/api/chat/upload-image',
                     formData,
-                    { headers: { 'Content-Type': 'multipart/form-data' } }
+                    { headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${dToken}` } }
                 )
                 if (data.success) {
                     socketRef.current.emit('send-message', {
@@ -255,8 +259,8 @@ const DoctorChat = ({ docId, patientId, patientName, patientImage, onClose }) =>
                         className={`flex ${msg.senderType === 'doctor' ? 'justify-end' : 'justify-start'}`}
                     >
                         <div className={`max-w-[80%] sm:max-w-[70%] px-3 py-2 rounded-2xl text-sm ${msg.senderType === 'doctor'
-                                ? 'bg-indigo-100 text-indigo-900 rounded-br-none'
-                                : 'bg-white text-gray-800 rounded-bl-none shadow'
+                            ? 'bg-indigo-100 text-indigo-900 rounded-br-none'
+                            : 'bg-white text-gray-800 rounded-bl-none shadow'
                             }`}>
                             {msg.imageUrl && (
                                 <img
