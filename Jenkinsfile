@@ -25,10 +25,15 @@ pipeline {
                     def ADMIN_IMAGE = "${DOCKER_USER}/docnest-admin:latest"
 
                     sh "docker build -t ${BACKEND_IMAGE} ./backend"
-
+                       
+                    def razorpayKey = sh(
+                    script: "grep '^VITE_RAZORPAY_KEY_ID=' /home/vagrant/DocNest/frontend/.env | cut -d '=' -f2 | tr -d \"'\"",
+                    returnStdout: true
+                    ).trim()
                     sh """
                     docker build \
                    --build-arg VITE_BACKEND_URL=http://${SERVER_IP}:4000 \
+                   --build-arg VITE_RAZORPAY_KEY_ID=${razorpayKey} \
                     -t ${FRONTEND_IMAGE} ./frontend
                     """
 
