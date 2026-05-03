@@ -4,6 +4,10 @@ node_modules/
 
 .env
 **/.env
+*.env
+**/*.env
+.env.*
+**/.env.*
 
 # Build outputs
 dist/
@@ -23,3 +27,5 @@ Thumbs.db
 
 # Uploaded files 
 uploads/
+
+k8s/secret.yaml
