@@ -167,6 +167,7 @@ test('CSRF token remains stable across requests', async () => {
     const first = await agent.get('/health')
     const firstCookie = first.headers['set-cookie']?.find(cookie => cookie.startsWith('csrfToken='))
     assert.ok(firstCookie)
+    assert.equal(first.headers['x-csrf-token']?.length, 64)
 
     const firstToken = decodeURIComponent(firstCookie.split(';')[0].split('=')[1])
     const second = await agent.get('/health')

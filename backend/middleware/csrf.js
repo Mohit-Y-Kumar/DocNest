@@ -25,6 +25,7 @@ export const csrfTokenGenerator = (req, res, next) => {
         maxAge: 60 * 60 * 1000,
         path: '/'
     })
+    res.setHeader('X-CSRF-Token', csrfToken)
 
     req.csrfToken = csrfToken
     res.locals.csrfToken = csrfToken

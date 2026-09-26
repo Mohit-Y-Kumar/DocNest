@@ -50,6 +50,7 @@ app.use(cors({
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning', 'X-CSRF-Token'],
+    exposedHeaders: ['X-CSRF-Token'],
     credentials: true
 }))
 

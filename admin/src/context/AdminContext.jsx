@@ -8,9 +8,6 @@ axios.defaults.withCredentials = true
 installAuthRefreshInterceptor(import.meta.env.VITE_BACKEND_URL)
 
 const ensureCsrfToken = async () => {
-    const token = getCsrfToken()
-    if (token) return token
-
     try {
         await axios.get(`${import.meta.env.VITE_BACKEND_URL}/health`, { withCredentials: true })
 
