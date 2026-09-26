@@ -22,11 +22,11 @@ const doctorSchema = new mongoose.Schema(
             default: false,
             index: true
         },
-        verificationToken: {
+        verificationOtp: {
             type: String,
             default: null
         },
-        verificationTokenExpiry: {
+        verificationOtpExpiry: {
             type: Date,
             default: null
         },

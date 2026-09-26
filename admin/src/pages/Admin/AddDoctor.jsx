@@ -23,10 +23,10 @@ const AddDoctor = () => {
     const [showPass,   setShowPass]   = useState(false)
     
     // Verification state
-    const [step, setStep] = useState(1) // 1 = add doctor, 2 = verify token
+    const [step, setStep] = useState(1) // 1 = add doctor, 2 = verify OTP
     const [doctorId, setDoctorId] = useState('')
     const [doctorEmail, setDoctorEmail] = useState('')
-    const [verificationToken, setVerificationToken] = useState('')
+    const [verificationOtp, setVerificationOtp] = useState('')
     const [verifyLoading, setVerifyLoading] = useState(false)
 
     const { backendUrl, getAllDoctors } = useContext(AdminContext)
@@ -77,17 +77,17 @@ const AddDoctor = () => {
         }
     }
 
-    const onVerifyTokenHandler = async (e) => {
+    const onVerifyOtpHandler = async (e) => {
         e.preventDefault()
-        if (!verificationToken.trim()) {
-            return toast.error('Please enter the verification token')
+        if (!/^\d{6}$/.test(verificationOtp)) {
+            return toast.error('Please enter the 6-digit verification code')
         }
 
         setVerifyLoading(true)
         try {
             const { data } = await axios.post(
                 backendUrl + '/api/admin/verify-doctor-token',
-                { doctorId, verificationToken: verificationToken.trim() },
+                { doctorId, verificationOtp },
                 { withCredentials: true }
             )
 
@@ -101,7 +101,7 @@ const AddDoctor = () => {
                 setStep(1)
                 setDoctorId('')
                 setDoctorEmail('')
-                setVerificationToken('')
+                setVerificationOtp('')
             } else {
                 toast.error(data.message)
             }
@@ -123,7 +123,7 @@ const AddDoctor = () => {
                 <div className='mx-auto max-w-2xl'>
                     <div className='mb-6'>
                         <h1 className='text-xl font-bold tracking-tight text-slate-800 sm:text-2xl'>Verify Doctor Email</h1>
-                        <p className='mt-1 text-sm text-slate-500'>Complete the email verification process</p>
+                        <p className='mt-1 text-sm text-slate-500'>Complete the email verification process with the 6-digit code</p>
                     </div>
 
                     <div className='rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_18px_35px_rgba(15,23,42,0.06)] sm:p-8'>
@@ -132,7 +132,7 @@ const AddDoctor = () => {
                                 <div className='text-lg text-emerald-600'>✓</div>
                                 <div>
                                     <p className='text-sm font-semibold text-emerald-800'>Doctor profile created successfully!</p>
-                                    <p className='mt-1 text-sm text-emerald-700'>An email verification link has been sent to <strong>{doctorEmail}</strong></p>
+                                    <p className='mt-1 text-sm text-emerald-700'>A verification code has been sent to <strong>{doctorEmail}</strong></p>
                                 </div>
                             </div>
                         </div>
@@ -141,13 +141,13 @@ const AddDoctor = () => {
                             <p className='mb-2 text-sm font-semibold text-indigo-900'>Next Steps:</p>
                             <ol className='list-inside list-decimal space-y-1 text-sm text-indigo-800'>
                                 <li>The doctor will receive a verification email</li>
-                                <li>They should click the link in the email</li>
-                                <li>A verification code will be provided</li>
+                                <li>They should check their email</li>
+                                <li>They will receive a 6-digit verification code</li>
                                 <li>Enter that code below to complete verification</li>
                             </ol>
                         </div>
 
-                        <form onSubmit={onVerifyTokenHandler}>
+                        <form onSubmit={onVerifyOtpHandler}>
                             <div className='mb-6'>
                                 <label className={lbl}>Doctor Email</label>
                                 <input 
@@ -159,16 +159,18 @@ const AddDoctor = () => {
                             </div>
 
                             <div className='mb-6'>
-                                <label className={lbl}>Verification Token</label>
+                                <label className={lbl}>Verification Code</label>
                                 <input 
-                                    onChange={e => setVerificationToken(e.target.value)} 
-                                    value={verificationToken}
+                                    onChange={e => setVerificationOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                                    value={verificationOtp}
                                     className={inp} 
                                     type='text' 
-                                    placeholder='Enter the verification code from email'
+                                    placeholder='Enter 6-digit code'
+                                    inputMode='numeric'
+                                    maxLength={6}
                                     required 
                                 />
-                                <p className='ml-1 mt-1.5 text-xs text-slate-500'>The doctor will provide this code to you after verifying their email</p>
+                                <p className='ml-1 mt-1.5 text-xs text-slate-500'>The doctor will share this code from the verification email</p>
                             </div>
 
                             <div className='flex flex-col gap-4 border-t border-slate-100 pt-4 sm:flex-row'>
@@ -176,7 +178,7 @@ const AddDoctor = () => {
                                     type='button'
                                     onClick={() => {
                                         setStep(1)
-                                        setVerificationToken('')
+                                        setVerificationOtp('')
                                     }}
                                     className='rounded-xl border border-slate-200 px-6 py-3 font-semibold text-slate-700 transition-all hover:bg-slate-50'
                                 >

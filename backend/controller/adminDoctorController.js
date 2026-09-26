@@ -8,6 +8,9 @@ import { isValidFee, isValidAddress } from '../utils/validation.js'
 import { sendMail } from '../config/mailer.js'
 import { logAuthEvent, logError } from '../config/logger.js'
 
+const generateVerificationOtp = () => crypto.randomInt(100000, 1000000).toString()
+const hashVerificationOtp = value => crypto.createHash('sha256').update(String(value).trim()).digest('hex')
+
 export const addDoctor = async (req, res) => {
 	try {
 		const { name, email, password, speciality, degree, experience, about, fees, address } = req.body
@@ -30,9 +33,8 @@ export const addDoctor = async (req, res) => {
 		const hashPassword = await bcrypt.hash(password, await bcrypt.genSalt(10))
 		const imageUpload = await cloudinary.uploader.upload(req.file.path, { resource_type: 'image' })
 
-		// Generate verification token (valid for 24 hours)
-		const verificationToken = crypto.randomBytes(32).toString('hex')
-		const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
+		const verificationOtp = generateVerificationOtp()
+		const verificationOtpExpiry = new Date(Date.now() + 15 * 60 * 1000)
 
 		const doctor = await new doctorModel({
 			name,
@@ -47,8 +49,8 @@ export const addDoctor = async (req, res) => {
 			address: parsedAddress,
 			date: Date.now(),
 			emailVerified: false,
-			verificationToken,
-			verificationTokenExpiry: tokenExpiry
+			verificationOtp: hashVerificationOtp(verificationOtp),
+			verificationOtpExpiry
 		}).save()
 
 		// Send verification email
@@ -57,25 +59,25 @@ export const addDoctor = async (req, res) => {
 		logAuthEvent('doctor_added', doctor._id, 'admin', { email })
 		let emailSent = true
 		try {
-			await sendMail({
+			emailSent = await sendMail({
 				to: email,
-				subject: 'DocNest Account Verification - Please Share Token with Admin',
+				subject: 'DocNest Doctor Verification Code',
 				html: `
 					<h2>Email Verification</h2>
 					<p>Hi Dr. ${name},</p>
 					<p>Your DocNest doctor account has been created by an administrator. Please verify your email address to activate your account.</p>
-					<p><strong>Your Verification Token:</strong></p>
-					<p style="font-size: 18px; font-family: monospace; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
-						${verificationToken}
+					<p><strong>Your 6-digit verification code:</strong></p>
+					<p style="font-size: 28px; font-family: monospace; letter-spacing: 8px; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
+						${verificationOtp}
 					</p>
 					<p><strong>Instructions:</strong></p>
 					<ol>
-						<li>Copy the verification token above</li>
-						<li>Share this token with the administrator who added you</li>
+						<li>Copy the 6-digit verification code above</li>
+						<li>Share this code with the administrator who added you</li>
 						<li>The administrator will verify your email in the doctor form</li>
 						<li>You'll then be able to login to your account</li>
 					</ol>
-					<p>This token will expire in 24 hours.</p>
+					<p>This code will expire in 15 minutes.</p>
 					<p>Best regards,<br/>DocNest Team</p>
 				`
 			})
@@ -87,7 +89,7 @@ export const addDoctor = async (req, res) => {
 		return res.status(201).json({
 			success: true,
 			message: emailSent
-				? 'Doctor added successfully. Verification email sent. Waiting for token verification.'
+				? 'Doctor added successfully. Verification code sent. Waiting for code verification.'
 				: 'Doctor added successfully, but the verification email could not be sent. Please resend it.',
 			doctorId: doctor._id,
 			doctorEmail: email,
@@ -105,12 +107,12 @@ export const addDoctor = async (req, res) => {
 
 export const verifyDoctorToken = async (req, res) => {
 	try {
-		const { doctorId, verificationToken } = req.body
+		const { doctorId, verificationOtp } = req.body
 
-		if (!doctorId || !verificationToken) {
+		if (!doctorId || !verificationOtp) {
 			return res.status(400).json({
 				success: false,
-				message: 'Doctor ID and verification token are required.'
+				message: 'Doctor ID and verification code are required.'
 			})
 		}
 
@@ -131,27 +133,26 @@ export const verifyDoctorToken = async (req, res) => {
 			})
 		}
 
-		// Check if token is valid and not expired
-		if (!doctor.verificationToken || doctor.verificationToken !== verificationToken) {
-			logAuthEvent('verify_token_failed_invalid', doctor._id, 'admin', { doctorId })
+		if (!/^\d{6}$/.test(String(verificationOtp).trim()) || !doctor.verificationOtp || hashVerificationOtp(verificationOtp) !== doctor.verificationOtp) {
+			logAuthEvent('verify_otp_failed_invalid', doctor._id, 'admin', { doctorId })
 			return res.status(401).json({
 				success: false,
-				message: 'Invalid verification token.'
+				message: 'Invalid verification code.'
 			})
 		}
 
-		if (doctor.verificationTokenExpiry < new Date()) {
-			logAuthEvent('verify_token_failed_expired', doctor._id, 'admin', { doctorId })
+		if (!doctor.verificationOtpExpiry || doctor.verificationOtpExpiry < new Date()) {
+			logAuthEvent('verify_otp_failed_expired', doctor._id, 'admin', { doctorId })
 			return res.status(401).json({
 				success: false,
-				message: 'Verification token has expired. Please resend verification email.'
+				message: 'Verification code has expired. Please resend the verification email.'
 			})
 		}
 
 		// Mark email as verified
 		doctor.emailVerified = true
-		doctor.verificationToken = null
-		doctor.verificationTokenExpiry = null
+		doctor.verificationOtp = null
+		doctor.verificationOtpExpiry = null
 		await doctor.save()
 
 		logAuthEvent('doctor_email_verified', doctor._id, 'admin', { doctorId })
@@ -175,30 +176,30 @@ export const resendDoctorVerification = async (req, res) => {
 		if (!doctor) return res.status(404).json({ success: false, message: 'Doctor not found.' })
 		if (doctor.emailVerified) return res.status(400).json({ success: false, message: 'Doctor email is already verified.' })
 
-		const verificationToken = crypto.randomBytes(32).toString('hex')
-		const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
-		doctor.verificationToken = verificationToken
-		doctor.verificationTokenExpiry = tokenExpiry
+		const verificationOtp = generateVerificationOtp()
+		doctor.verificationOtp = hashVerificationOtp(verificationOtp)
+		doctor.verificationOtpExpiry = new Date(Date.now() + 15 * 60 * 1000)
 		await doctor.save()
 
 		try {
-			await sendMail({
+			const emailSent = await sendMail({
 				to: doctor.email,
-				subject: 'DocNest Account Verification (Resent) - Please Share Token with Admin',
+				subject: 'DocNest Doctor Verification Code (Resent)',
 				html: `
 					<h2>Email Verification</h2>
 					<p>Hi Dr. ${doctor.name},</p>
-					<p>Here is a new verification token for your DocNest account.</p>
-					<p style="font-size: 18px; font-family: monospace; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
-						${verificationToken}
+					<p>Here is a new verification code for your DocNest account.</p>
+					<p style="font-size: 28px; font-family: monospace; letter-spacing: 8px; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
+						${verificationOtp}
 					</p>
-					<p>This token will expire in 24 hours.</p>
+					<p>This code will expire in 15 minutes.</p>
 					<p>Best regards,<br/>DocNest Team</p>
 				`
 			})
+			if (!emailSent) throw new Error('Brevo did not accept the verification email')
 		} catch (mailError) {
 			logError(mailError, { action: 'resendDoctorVerification_sendEmail', doctorId: doctor._id })
-			return res.status(502).json({ success: false, message: 'Token regenerated but the email could not be sent. Try again shortly.' })
+			return res.status(502).json({ success: false, message: 'Code regenerated but the email could not be sent. Try again shortly.' })
 		}
 
 		logAuthEvent('doctor_verification_resent', doctor._id, 'admin', { doctorId })
