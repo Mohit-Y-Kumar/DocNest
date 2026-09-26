@@ -1,7 +1,8 @@
 import nodemailer from 'nodemailer'
 
-const gmailUser = process.env.EMAIL_USER
-const hasSmtpCredentials = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS)
+const gmailUser = process.env.EMAIL_USER?.trim()
+const gmailPassword = process.env.EMAIL_PASS?.replace(/\s+/g, '')
+const hasSmtpCredentials = Boolean(gmailUser && gmailPassword)
 
 const baseTimeouts = {
     pool: true,
@@ -15,8 +16,8 @@ const smtpTransport = hasSmtpCredentials
     ? nodemailer.createTransport({
         service: 'gmail',
         auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
+            user: gmailUser,
+            pass: gmailPassword
         },
         ...baseTimeouts
     })

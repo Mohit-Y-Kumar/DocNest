@@ -11,6 +11,8 @@ COPY . .
 ARG VITE_BACKEND_URL
 ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
 
+RUN test -n "$VITE_BACKEND_URL" && case "$VITE_BACKEND_URL" in http://*|https://*) ;; *) echo "VITE_BACKEND_URL must start with http:// or https://"; exit 1 ;; esac
+
 RUN npm run build
 
 FROM nginx:alpine

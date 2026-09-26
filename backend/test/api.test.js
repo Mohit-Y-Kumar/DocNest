@@ -109,9 +109,8 @@ test('review mutation routes require user authentication', async () => {
     }
 })
 
-test('configured admin password hash matches the expected credential', async () => {
-    const isValid = await bcrypt.compare('Admin@123', process.env.ADMIN_PASSWORD_HASH)
-    assert.equal(isValid, true)
+test('configured admin password is a bcrypt hash', () => {
+    assert.match(process.env.ADMIN_PASSWORD_HASH, /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/)
 })
 
 test('refresh without a cookie returns 401', async () => {

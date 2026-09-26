@@ -95,9 +95,8 @@ export const registerUser = async (req, res) => {
             verificationOtpExpiry: new Date(Date.now() + 15 * 60 * 1000)
         }).save()
         
-        // Send verification email in the background so the user is not blocked while SMTP is slow or unavailable.
         const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}&email=${email}`
-        void sendAuthEmail({
+        const emailSent = await sendAuthEmail({
             to: email,
             subject: 'Verify Your DocNest Account',
             name,
@@ -106,13 +105,14 @@ export const registerUser = async (req, res) => {
             link: verificationLink,
             description: 'Thank you for registering with DocNest. Use the OTP below to verify your email address, or use the link below to confirm instantly.',
             expiryText: 'This OTP and link expire in 24 hours.'
-        }).then((emailSent) => {
-            if (!emailSent) {
-                logAuthEvent('register_email_failed', user._id, 'user', { email })
-                return
-            }
-            logAuthEvent('register_email_sent', user._id, 'user', { email })
         })
+
+        if (!emailSent) {
+            logAuthEvent('register_email_failed', user._id, 'user', { email })
+            return res.status(503).json({ success: false, message: 'Account created, but the verification email could not be sent. Please try again later.' })
+        }
+
+        logAuthEvent('register_email_sent', user._id, 'user', { email })
 
         logAuthEvent('register_success', user._id, 'user', { email })
         return res.status(201).json({ 
@@ -373,7 +373,7 @@ export const resendVerificationEmail = async (req, res) => {
         await user.save()
 
         const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`
-        void sendAuthEmail({
+        const emailSent = await sendAuthEmail({
             to: email,
             subject: 'Verify Your DocNest Account',
             name: user.name,
@@ -382,13 +382,14 @@ export const resendVerificationEmail = async (req, res) => {
             link: verificationLink,
             description: 'Use the OTP below to verify your email address, or click the secure link below to confirm instantly.',
             expiryText: 'This OTP and link expire in 24 hours.'
-        }).then((emailSent) => {
-            if (!emailSent) {
-                logAuthEvent('verification_email_failed', user._id, 'user', { email })
-                return
-            }
-            logAuthEvent('verification_email_resent', user._id, 'user', { email })
         })
+
+        if (!emailSent) {
+            logAuthEvent('verification_email_failed', user._id, 'user', { email })
+            return res.status(503).json({ success: false, message: 'Verification email could not be sent. Please try again later.' })
+        }
+
+        logAuthEvent('verification_email_resent', user._id, 'user', { email })
 
         return res.json({ success: true, message: 'Verification email sent successfully.' })
     } catch (error) {
