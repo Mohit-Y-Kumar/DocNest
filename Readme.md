@@ -22,7 +22,7 @@ This project supports:
 - AI symptom assistant for medical specialty guidance
 - production-ready environment validation, health endpoints, and deployment manifests
 
-Email and password recovery links are sent through the configured SMTP provider. Reset tokens are stored hashed, expire after one hour, and invalidate existing user sessions after a successful password change.
+Email and password recovery links are sent through Brevo's transactional email API. Reset tokens are stored hashed, expire after one hour, and invalidate existing user sessions after a successful password change.
 
 ## Tech stack
 
@@ -65,7 +65,7 @@ DocNest uses a layered architecture with separate patient and operations clients
 │                      DATA AND INTEGRATIONS                            │
 │  Mongoose models → MongoDB                                            │
 │  Razorpay (payments/refunds) · Cloudinary (media)                    │
-│  SMTP (verification/recovery email) · Groq (AI symptom assistant)    │
+│  Brevo transactional email · Groq (AI symptom assistant)            │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -74,7 +74,7 @@ DocNest uses a layered architecture with separate patient and operations clients
 - **Client layer:** The patient app handles discovery, appointments, payments, profiles, chat, and the symptom assistant. The admin portal supports doctor onboarding, appointment operations, analytics, and doctor access.
 - **Transport and middleware:** Express serves REST endpoints while Socket.IO handles real-time chat and call signaling. Shared middleware applies origin checks, security headers, CSRF validation, rate limiting, authentication, uploads, and audit logging.
 - **Application layer:** Role-specific routes delegate to controllers for user, doctor, admin, appointment, payment, refund, review, chat, and call workflows. Controllers use Mongoose models for transactional state changes and token/session persistence.
-- **Integration layer:** MongoDB stores platform data; Razorpay processes payments and refunds; Cloudinary stores media; SMTP sends account emails; and Groq powers AI-assisted symptom guidance.
+- **Integration layer:** MongoDB stores platform data; Razorpay processes payments and refunds; Cloudinary stores media; Brevo sends account emails; and Groq powers AI-assisted symptom guidance.
 
 ### Deployment topology
 
@@ -226,7 +226,7 @@ DocNest/
 - Cloudinary account
 - Razorpay account
 - Groq API key
-- SMTP-capable email provider
+- Brevo account with a verified sender
 - Docker and Docker Compose for local containerized setup
 
 ## Local development
@@ -262,8 +262,9 @@ Set values for:
 - FRONTEND_URL
 - APP_URL
 - ALLOWED_ORIGINS
-- EMAIL_USER
-- EMAIL_PASS
+- BREVO_API_KEY
+- EMAIL_FROM
+- EMAIL_FROM_NAME
 - CLOUDINARY_CLOUD_NAME
 - CLOUDINARY_API_KEY
 - CLOUDINARY_API_SECRET

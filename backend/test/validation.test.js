@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { validateEnv } from '../config/env.js'
 import { isValidAppointmentDate, isValidFee, isValidSlotTime, parseAppointmentDateTime } from '../utils/validation.js'
 
-test('accepts Gmail SMTP credentials without OAuth config', () => {
+test('accepts Brevo email credentials without OAuth or SMTP config', () => {
     const previousEnv = { ...process.env }
 
     try {
@@ -16,12 +16,9 @@ test('accepts Gmail SMTP credentials without OAuth config', () => {
         process.env.RAZORPAY_KEY_ID = 'rzp_test_123'
         process.env.RAZORPAY_KEY_SECRET = 'secret_123'
         process.env.RAZORPAY_WEBHOOK_SECRET = 'webhook_secret_123'
-        process.env.EMAIL_USER = 'smtp-user@gmail.com'
-        process.env.EMAIL_PASS = 'smtp-password'
-        delete process.env.GOOGLE_CLIENT_ID
-        delete process.env.GOOGLE_CLIENT_SECRET
-        delete process.env.GOOGLE_REFRESH_TOKEN
-        delete process.env.GOOGLE_USER
+        process.env.BREVO_API_KEY = 'brevo-api-key'
+        process.env.EMAIL_FROM = 'verified@example.com'
+        process.env.EMAIL_FROM_NAME = 'DocNest'
 
         assert.doesNotThrow(() => validateEnv())
     } finally {
@@ -29,7 +26,7 @@ test('accepts Gmail SMTP credentials without OAuth config', () => {
     }
 })
 
-test('rejects missing SMTP credentials even if OAuth variables are present', () => {
+test('rejects missing Brevo credentials', () => {
     const previousEnv = { ...process.env }
 
     try {
@@ -42,14 +39,11 @@ test('rejects missing SMTP credentials even if OAuth variables are present', () 
         process.env.RAZORPAY_KEY_ID = 'rzp_test_123'
         process.env.RAZORPAY_KEY_SECRET = 'secret_123'
         process.env.RAZORPAY_WEBHOOK_SECRET = 'webhook_secret_123'
-        process.env.GOOGLE_CLIENT_ID = 'oauth-client-id'
-        process.env.GOOGLE_CLIENT_SECRET = 'oauth-client-secret'
-        process.env.GOOGLE_REFRESH_TOKEN = 'oauth-refresh-token'
-        process.env.GOOGLE_USER = 'noreply@gmail.com'
-        delete process.env.EMAIL_USER
-        delete process.env.EMAIL_PASS
+        delete process.env.BREVO_API_KEY
+        delete process.env.EMAIL_FROM
+        delete process.env.EMAIL_FROM_NAME
 
-        assert.throws(() => validateEnv(), /EMAIL_USER\/EMAIL_PASS/i)
+        assert.throws(() => validateEnv(), /BREVO_API_KEY\/EMAIL_FROM/i)
     } finally {
         process.env = previousEnv
     }

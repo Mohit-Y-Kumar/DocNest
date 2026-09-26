@@ -1,49 +1,49 @@
-import nodemailer from 'nodemailer'
-
-const gmailUser = process.env.EMAIL_USER?.trim()
-const gmailPassword = process.env.EMAIL_PASS?.replace(/\s+/g, '')
-const hasSmtpCredentials = Boolean(gmailUser && gmailPassword)
-
-const baseTimeouts = {
-    pool: true,
-    maxConnections: 5,
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000
-}
-
-const smtpTransport = hasSmtpCredentials
-    ? nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: gmailUser,
-            pass: gmailPassword
-        },
-        ...baseTimeouts
-    })
-    : null
+const brevoApiKey = process.env.BREVO_API_KEY?.trim()
+const senderEmail = process.env.EMAIL_FROM?.trim()
+const senderName = process.env.EMAIL_FROM_NAME?.trim() || 'DocNest'
+const hasBrevoCredentials = Boolean(brevoApiKey && senderEmail)
+const brevoEndpoint = 'https://api.brevo.com/v3/smtp/email'
 
 export const sendMail = async ({ to, subject, html }) => {
-    if (!smtpTransport) {
-        console.error('[Mailer] Gmail SMTP credentials are missing. Set EMAIL_USER and EMAIL_PASS.')
+    if (!hasBrevoCredentials) {
+        console.error('[Mailer] Brevo credentials are missing. Set BREVO_API_KEY and EMAIL_FROM.')
         return false
     }
 
-    const mailOptions = {
-        from: `"DocNest" <${gmailUser}>`,
-        to,
+    const payload = {
+        sender: {
+            name: senderName,
+            email: senderEmail
+        },
+        to: [{ email: to }],
         subject,
-        html
+        htmlContent: html
     }
 
     try {
-        const info = await smtpTransport.sendMail(mailOptions)
-        console.log(`[Mailer] Email sent via SMTP to ${to} (${info?.messageId || 'no-message-id'})`)
+        const response = await fetch(brevoEndpoint, {
+            method: 'POST',
+            headers: {
+                accept: 'application/json',
+                'api-key': brevoApiKey,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+
+        if (!response.ok) {
+            const errorBody = await response.text()
+            console.error(`[Mailer] Brevo send failed (${response.status}): ${errorBody}`)
+            return false
+        }
+
+        const result = await response.json()
+        console.log(`[Mailer] Email sent via Brevo to ${to} (${result.messageId || 'no-message-id'})`)
         return true
     } catch (error) {
-        console.error('[Mailer] Gmail SMTP send failed:', error.message)
+        console.error('[Mailer] Brevo request failed:', error.message)
         return false
     }
 }
 
-export default smtpTransport || null
+export default hasBrevoCredentials ? { endpoint: brevoEndpoint } : null

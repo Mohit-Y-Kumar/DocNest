@@ -16,6 +16,7 @@ const Login = () => {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showVerificationMessage, setShowVerificationMessage] = useState(false)
+  const [verificationEmailFailed, setVerificationEmailFailed] = useState(false)
   const [registeredEmail, setRegisteredEmail] = useState('')
   const [otp, setOtp] = useState('')
 
@@ -87,6 +88,7 @@ const Login = () => {
         if (data.success) {
           toast.success('Account created! Please check your email to verify your account.')
           setRegisteredEmail(email)
+          setVerificationEmailFailed(false)
           setShowVerificationMessage(true)
           // Clear form
           setName('')
@@ -111,6 +113,7 @@ const Login = () => {
     } catch (err) {
       if (state === 'Sign Up' && err.response?.status === 503 && email) {
         setRegisteredEmail(email)
+        setVerificationEmailFailed(true)
         setShowVerificationMessage(true)
       }
       toast.error(err.response?.data?.message || err.message || 'Something went wrong.')
@@ -131,7 +134,7 @@ const Login = () => {
             </div>
           </div>
           <h2 className='text-xl font-semibold text-slate-800 sm:text-2xl'>Verify Your Email</h2>
-          <p className='text-sm text-slate-500'>We&apos;ve sent a verification email to:</p>
+          <p className='text-sm text-slate-500'>{verificationEmailFailed ? 'The account was created, but we could not send the verification email to:' : 'We\'ve sent a verification email to:'}</p>
           <p className='break-all text-sm font-medium text-slate-800'>{registeredEmail}</p>
           <p className='text-xs leading-relaxed text-slate-600 sm:text-sm'>
             Use the 6-digit verification code or click the secure link in the email to verify your account. The code and link expire in 24 hours.

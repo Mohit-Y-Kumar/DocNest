@@ -26,8 +26,9 @@ const optionalEnv = [
     'CLOUDINARY_API_KEY',
     'CLOUDINARY_API_SECRET',
     'MONGO_TRANSACTIONS_REQUIRED',
-    'EMAIL_USER',
-    'EMAIL_PASS'
+    'BREVO_API_KEY',
+    'EMAIL_FROM',
+    'EMAIL_FROM_NAME'
 ]
 
 export const validateEnv = (customRequired = [], customOptional = []) => {
@@ -52,10 +53,10 @@ export const validateEnv = (customRequired = [], customOptional = []) => {
         }
     }
 
-    const hasSmtpConfig = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS)
+    const hasBrevoConfig = Boolean(process.env.BREVO_API_KEY && process.env.EMAIL_FROM)
 
-    if (!hasSmtpConfig) {
-        missing.push('EMAIL_USER/EMAIL_PASS')
+    if (!hasBrevoConfig) {
+        missing.push('BREVO_API_KEY/EMAIL_FROM')
     }
 
     if (process.env.NODE_ENV === 'production') {
