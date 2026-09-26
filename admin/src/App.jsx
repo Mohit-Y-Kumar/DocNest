@@ -26,7 +26,7 @@ const App = () => {
         <div className='min-h-screen flex items-center justify-center bg-[#F8F9FD] text-slate-500'>Checking session...</div>
       ) : aToken || dToken ? (
         <div className='min-h-screen bg-[#F8F9FD]'>
-          <ToastContainer />
+          <ToastContainer limit={1} />
 
           <div className='fixed top-0 left-0 right-0 z-40'>
             <Navbar />
@@ -55,7 +55,7 @@ const App = () => {
       ) : (
         <>
           <Login />
-          <ToastContainer />
+          <ToastContainer limit={1} />
         </>
       )}
     </ErrorBoundary>

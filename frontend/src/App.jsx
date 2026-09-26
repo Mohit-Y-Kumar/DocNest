@@ -39,6 +39,7 @@ const App = () => {
       <div className='min-h-screen overflow-x-hidden bg-transparent text-slate-800'>
         <ToastContainer
           position='top-right'
+          limit={1}
           autoClose={3000}
           hideProgressBar={false}
           newestOnTop
