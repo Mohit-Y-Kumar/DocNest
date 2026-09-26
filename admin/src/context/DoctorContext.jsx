@@ -50,15 +50,16 @@ const DoctorContextProvider = (props) => {
       .catch((error) => {
         if (!isMounted) return
         setAuthReady(true)
-        
-        // Log refresh errors for debugging
-        if (error.response?.status === 401) {
-          console.warn('[DoctorContext] Refresh token validation failed (401). This may indicate stale cookies. Clear browser cookies if login issues persist.')
-          console.error('[DoctorContext] Refresh error:', error.response?.data?.message)
+
+        const status = error.response?.status
+        if (status === 401 || status === 403) {
+          clearActiveRole()
+          setDToken(false)
+          return
         }
-        
-        clearActiveRole()
-        setDToken(false)
+
+        console.warn('[DoctorContext] Session refresh temporarily failed; keeping the doctor session available for retry.', error.message)
+        setDToken(true)
       })
 
     return () => {

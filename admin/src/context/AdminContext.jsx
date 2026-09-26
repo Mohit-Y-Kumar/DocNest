@@ -51,14 +51,15 @@ const AdminContextProvider = (props) => {
                 if (!isMounted) return
                 setAuthReady(true)
 
-                // Log refresh errors for debugging
-                if (error.response?.status === 401) {
-                    console.warn('[AdminContext] Refresh token validation failed (401). This may indicate stale cookies. Clear browser cookies if login issues persist.')
-                    console.error('[AdminContext] Refresh error:', error.response?.data?.message)
+                const status = error.response?.status
+                if (status === 401 || status === 403) {
+                    clearActiveRole()
+                    setAToken(false)
+                    return
                 }
 
-                clearActiveRole()
-                setAToken(false)
+                console.warn('[AdminContext] Session refresh temporarily failed; keeping the admin session available for retry.', error.message)
+                setAToken(true)
             })
 
         return () => {

@@ -38,6 +38,8 @@ const roleFromRequest = url => {
     return match?.[1]
 }
 
+const isAuthRequest = url => /\/api\/(?:admin|doctor)\/(?:login|refresh|logout)(?:[/?#]|$)/.test(url || '')
+
 export const installAuthRefreshInterceptor = backendUrl => {
     if (axios.__docNestRefreshInterceptor) return
     axios.__docNestRefreshInterceptor = true
@@ -45,7 +47,7 @@ export const installAuthRefreshInterceptor = backendUrl => {
     axios.interceptors.response.use(undefined, async error => {
         const request = error.config
         const role = roleFromRequest(request?.url)
-        if (error.response?.status !== 401 || !request || request._retry || !role || request.url?.includes('/refresh')) {
+        if (error.response?.status !== 401 || !request || request._retry || !role || isAuthRequest(request.url)) {
             return Promise.reject(error)
         }
 
